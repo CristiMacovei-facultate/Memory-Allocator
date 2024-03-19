@@ -1,12 +1,8 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-typedef struct arraylist {
-  int capacity;
-  int num_elements;
-  size_t element_size;
-  void *data;
-} arraylist_t;
+#include "arraylist.h"
 
 arraylist_t* al_create(int capacity, size_t element_size) {
   arraylist_t *new = (arraylist_t*)malloc(sizeof(arraylist_t));  
@@ -29,11 +25,12 @@ void *al_get(arraylist_t *list, int index) {
 }
 
 void al_insert(arraylist_t *list, int index, void *src) {
-  if (index >= list->capacity) {
+  list->num_elements++;
+
+  if (list->num_elements > list->capacity) {
     al_resize(list, list->capacity * 2);
   }
 
-  list->num_elements++;
   if (index < list->num_elements) {
     for (int i = list->num_elements - 1; i > index; --i) {
       memcpy(al_get(list, i), al_get(list, i - 1), list->element_size);
@@ -42,9 +39,23 @@ void al_insert(arraylist_t *list, int index, void *src) {
   
   void *ptr = al_get(list, index);
   memcpy(ptr, src, list->element_size);
+
+  // printf("Now on %d dlls out of %lu\n", list->num_elements, list->capacity);
 }
 
 void al_free(arraylist_t *list) {
   free(list->data);
   free(list);
+}
+
+// linear search, maybe could be changed to binary search if arraylist is kept in order
+int al_first_if(arraylist_t *list, void *target, int cmp(const void*, const void*)) {
+  for (int i = 0; i < list->num_elements; ++i) {
+    void *curr = al_get(list, i);
+    if (cmp(target, curr) == 1) {
+      return i;
+    }
+  }
+
+  return list->num_elements;
 }

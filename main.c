@@ -21,6 +21,10 @@ int starts_with(char *cmd, char *string) {
   return 1;
 }
 
+int dll_greater_than(const void* target_size, const void *a) {
+  return ((dll_t*)a)->block_size > (*(size_t*)target_size);
+}
+
 void handle_init(char *cmd, sfl_t **ptr_list) {
   char sep[] = " ";
   char *p = strtok(cmd, sep);
@@ -112,9 +116,10 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 }
 
 void handle_print(char *cmd, sfl_t *list) {
-  printf("SFL with %d lists of size %lu each\n", list->num_lists, list->bytes_per_list);
+  printf("----------\n");
+  printf("SFL with %d lists\n", list->dlls->num_elements);
 
-  for (int i = 0; i < list->num_lists; ++i) {
+  for (int i = 0; i < list->dlls->num_elements; ++i) {
     printf("List %d with size %lu: [", i, ((dll_t *)al_get(list->dlls, i))->block_size);
 
     for (dll_node_t *node = ((dll_t *)al_get(list->dlls, i))->head; node; node = node->next) {
@@ -122,6 +127,7 @@ void handle_print(char *cmd, sfl_t *list) {
     }
     printf("]\n");
   }
+  printf("----------\n");
 }
 
 void handle_malloc(char *cmd, sfl_t *list) {
@@ -137,7 +143,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
   int i = 0; 
   while (i < 4 && p) {
-    printf("Arg %d: '%s'\n", i, p);
+    // printf("Arg %d: '%s'\n", i, p);
     
     // start address 
     if (i == 1) {
@@ -156,13 +162,13 @@ void handle_malloc(char *cmd, sfl_t *list) {
     return;
   }
 
-  printf("[d] Have to alloc %lu bytes\n", requested);
+  // printf("[d] Have to alloc %lu bytes\n", requested);
   for (int i = 0; i < list->dlls->num_elements; ++i) {
-    printf("[d] Searching on list %d\n", i);
+    // printf("[d] Searching on list %d\n", i);
     dll_t *dll = al_get(list->dlls, i);
 
     if (dll->num_nodes == 0) {
-      fprintf(stderr, "[WARN] Skipping list %d, zero blocks remaining\n", i);
+      // fprintf(stderr, "[WARN] Skipping list %d, zero blocks remaining\n", i);
       continue;
     }
 
@@ -176,18 +182,49 @@ void handle_malloc(char *cmd, sfl_t *list) {
     dll->head = dll->head->next;
     dll->num_nodes--;
 
+    dll_node_t *shard = malloc(sizeof(dll_node_t));
+    shard->start_addr = mallocd_node->start_addr + requested;
+    size_t shard_size = dll->block_size - requested;
+
+    //todo skep shenaningans if shard_size == 0
+    
     free(mallocd_node);
 
     printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
     printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
-    printf("Remaining head on: %p\n", dll->head);
+    // printf("Remaining head on: %p\n", dll->head);
 
     // todo fragment block and move the shard to another dll (create if non-existent)
-    // todo implement al_find_if
-    // todo implement al_insert_first_if
+    
+    int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_than);
+    int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
+    printf("Shard of size %lu will be inserted in list %d (exact = %d)\n", shard_size, shard_dll_idx, exact_match);
+
+    if (exact_match) {
+      dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
+      // todo write append functionality
+      if (shard_dll->num_nodes == 0) {
+        shard_dll->head = shard;
+      }
+      shard_dll->tail->next = shard;
+      shard_dll->tail = shard;
+      shard_dll->num_nodes++;
+    }
+    else {
+      // printf("Non exact match, will insert on index %d\n", shard_dll_idx);
+      dll_t *shard_dll = malloc(sizeof(dll_t));
+      shard_dll->head = shard;
+      shard_dll->tail = shard;
+      shard_dll->block_size = shard_size;
+      shard_dll->num_nodes = 1;
+      // printf("Before on %d dlls\n", list->dlls->num_elements);
+      al_insert(list->dlls, shard_dll_idx, shard_dll);
+      // printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
+    }
+
     // todo implement structure to hold alloc'd blocks
 
-    break;
+    return;
   }
 
   fprintf(stderr, "Out of memory.\n");
