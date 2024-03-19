@@ -5,8 +5,8 @@
 #include <stdint.h>
 
 typedef struct arraylist {
-  uint64_t num_elements;
-  uint64_t element_size;
+  int num_elements;
+  size_t element_size;
   void *data;
 } arraylist_t;
 

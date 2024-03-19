@@ -106,7 +106,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
     ((dll_t *)al_get(list->dlls, i))->tail = prev;
   }
 
-  // printf("Finished alloc\n");
+  printf("Finished alloc, num lists: %d\n", list->dlls->num_elements);
 
   *ptr_list = list;
 }
@@ -158,6 +158,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
   printf("[d] Have to alloc %lu bytes\n", requested);
   for (int i = 0; i < list->dlls->num_elements; ++i) {
+    printf("[d] Searching on list %d\n", i);
     dll_t *dll = al_get(list->dlls, i);
 
     if (dll->num_nodes == 0) {
@@ -189,7 +190,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
     break;
   }
 
-  printf(stderr, "Out of memory.\n");
+  fprintf(stderr, "Out of memory.\n");
 }
 
 void handle_free(char *cmd, sfl_t **ptr_list) {

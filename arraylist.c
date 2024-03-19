@@ -29,7 +29,7 @@ void *al_get(arraylist_t *list, int index) {
 }
 
 void al_insert(arraylist_t *list, int index, void *src) {
-  if (index > list->capacity) {
+  if (index >= list->capacity) {
     al_resize(list, list->capacity * 2);
   }
 
