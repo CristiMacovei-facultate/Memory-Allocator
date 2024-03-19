@@ -124,63 +124,73 @@ void handle_print(char *cmd, sfl_t *list) {
   }
 }
 
-// void handle_malloc(char *cmd, sfl_t *list) {
-//   if (!list) {
-//     fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
-//     return;
-//   }
+void handle_malloc(char *cmd, sfl_t *list) {
+  if (!list) {
+    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    return;
+  }
 
-//   char sep[] = " ";
-//   char *p = strtok(cmd, sep);
+  char sep[] = " ";
+  char *p = strtok(cmd, sep);
 
-//   uint64_t requested = 0;
+  uint64_t requested = 0;
 
-//   int i = 0; 
-//   while (i < 4 && p) {
-//     printf("Arg %d: '%s'\n", i, p);
+  int i = 0; 
+  while (i < 4 && p) {
+    printf("Arg %d: '%s'\n", i, p);
     
-//     // start address 
-//     if (i == 1) {
-//       uint64_t tmp_requested = atoi(p); // todo change this shit to uint64_t
-//       if (tmp_requested) {
-//         requested = tmp_requested;
-//       }
-//     }
+    // start address 
+    if (i == 1) {
+      uint64_t tmp_requested = atoi(p); // todo change this shit to uint64_t
+      if (tmp_requested) {
+        requested = tmp_requested;
+      }
+    }
 
-//     ++i;
-//     p = strtok(NULL, sep);
-//   }
+    ++i;
+    p = strtok(NULL, sep);
+  }
 
-//   if (!requested) {
-//     fprintf(stderr, "Cannot alloc 0 bytes\n");
-//     return;
-//   }
+  if (!requested) {
+    fprintf(stderr, "Cannot alloc 0 bytes\n");
+    return;
+  }
 
-//   printf("[d] Have to alloc %lu bytes\n", requested);
-//   for (int i = 0; i < list->num_lists; ++i) {
-//     if (list->dlls[i]->num_nodes == 0) {
-//       fprintf(stderr, "[WARN] Skipping list %d, zero blocks remaining\n", i);
-//       continue;
-//     }
+  printf("[d] Have to alloc %lu bytes\n", requested);
+  for (int i = 0; i < list->dlls->num_elements; ++i) {
+    dll_t *dll = al_get(list->dlls, i);
 
-//     if (list->dlls[i]->block_size < requested) {
-//       continue;
-//     }
+    if (dll->num_nodes == 0) {
+      fprintf(stderr, "[WARN] Skipping list %d, zero blocks remaining\n", i);
+      continue;
+    }
 
-//     // alloc head of dll
-//     dll_node_t *mallocd_node = list->dlls[i]->head;
+    if (dll->block_size < requested) {
+      continue;
+    }
+
+    // alloc head of dll
+    dll_node_t *mallocd_node = dll->head;
     
-//     list->dlls[i]->head = list->dlls[i]->head->next;
-//     list->dlls[i]->num_nodes--;
+    dll->head = dll->head->next;
+    dll->num_nodes--;
 
-//     free(mallocd_node);
+    free(mallocd_node);
 
-//     printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
-//     printf("Will break block of size %lu into %lu and %lu\n", list->dlls[i]->block_size, requested, list->dlls[i]->block_size - requested);
-  
-//     break;
-//   }
-// }
+    printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
+    printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
+    printf("Remaining head on: %p\n", dll->head);
+
+    // todo fragment block and move the shard to another dll (create if non-existent)
+    // todo implement al_find_if
+    // todo implement al_insert_first_if
+    // todo implement structure to hold alloc'd blocks
+
+    break;
+  }
+
+  printf(stderr, "Out of memory.\n");
+}
 
 void handle_free(char *cmd, sfl_t **ptr_list) {
   sfl_t *list = *ptr_list;
@@ -217,9 +227,9 @@ int main() {
     else if (starts_with(cmd, "PRINT")) {
       handle_print(cmd, list);
     }
-    // else if (starts_with(cmd, "MALLOC")) {
-    //   handle_malloc(cmd, list);
-    // }
+    else if (starts_with(cmd, "MALLOC")) {
+      handle_malloc(cmd, list);
+    }
     else if (starts_with(cmd, "DESTROY_HEAP")) {
       handle_free(cmd, &list);
       return 0;
