@@ -79,7 +79,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
     tmp->head = NULL;
     tmp->tail = NULL;
     tmp->num_nodes = num_blocks;
-    al_set(list->dlls, i, tmp);
+    al_insert(list->dlls, i, tmp);
     free(tmp);
     // printf("set to %lu\n", ((dll_t *)al_get(list->dlls, i))->block_size);
 

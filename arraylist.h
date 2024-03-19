@@ -14,7 +14,7 @@ arraylist_t *al_create(int capacity, size_t size);
 
 void *al_get(arraylist_t *list, int index);
 
-void al_set(arraylist_t *list, int index, void *src);
+void al_insert(arraylist_t *list, int index, void *src);
 
 void al_free(arraylist_t *list);
 
