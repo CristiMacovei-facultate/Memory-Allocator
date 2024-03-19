@@ -64,33 +64,43 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   list->bytes_per_list = bytes_per_list;
   list->type = 0; //todo change this in the future
   
-  list->array = malloc(num_lists * sizeof(dll_node_t *));
+  list->array = malloc(num_lists * sizeof(dll_t *));
   uint64_t addr = list->start_addr;
   for (int i = 0; i < num_lists; ++i) {
     uint64_t block_size = ((uint64_t)8 << i);
-    uint64_t num_blocks = bytes_per_list / block_size; 
+    uint64_t num_blocks = bytes_per_list / block_size;
+    // printf("Will alloc list of %lu blocks with %lu size each\n", num_blocks, block_size);
 
-    list->array[i] = malloc(sizeof(dll_node_t));
+    list->array[i] = malloc(sizeof(dll_t));
     (list->array[i])->block_size = block_size;
-    (list->array[i])->prev = NULL;
-    (list->array[i])->next = NULL;
-    (list->array[i])->start_addr = addr;
-    addr += block_size;
+    (list->array[i])->head = NULL;
+    (list->array[i])->tail = NULL;
+    (list->array[i])->num_nodes = 0;
 
-    dll_node_t *prev = list->array[i];
-    for (int i = 1; i < num_blocks; ++i) {
+    list->array[i]->head = NULL; // todo do the first one separately
+    dll_node_t *prev = NULL;
+    for (int j = 0; j < num_blocks; ++j) {
+      // printf("[d] Alloc block %d on addr %lu\n", i, addr);
       dll_node_t *new = malloc(sizeof(dll_node_t));
     
-      new->block_size = block_size;
       new->next = NULL;
       new->prev = prev;
       new->start_addr = addr;
       addr += block_size;
 
-      prev->next = new;
+      if (prev) {
+        prev->next = new;
+      }
+      else {
+        list->array[i]->head = new;
+      }
+
       prev = new;
     }
+    list->array[i]->tail = prev;
   }
+
+  // printf("Finished alloc\n");
 
   *ptr_list = list;
 }
@@ -99,12 +109,53 @@ void handle_print(char *cmd, sfl_t *list) {
   printf("SFL with %d lists of size %lu each\n", list->num_lists, list->bytes_per_list);
 
   for (int i = 0; i < list->num_lists; ++i) {
-    printf("List %d: [", i);
+    printf("List %d with size %lu: [", i, list->array[i]->block_size);
 
-    for (dll_node_t *node = list->array[i]; node; node = node->next) {
-      printf("(sz = %lu, addr = %lu), ", node->block_size, node->start_addr);
+    for (dll_node_t *node = list->array[i]->head; node; node = node->next) {
+      printf("(addr = %lu), ", node->start_addr);
     }
     printf("]\n");
+  }
+}
+
+void handle_malloc(char *cmd, sfl_t *list) {
+  if (!list) {
+    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    return;
+  }
+
+  char sep[] = " ";
+  char *p = strtok(cmd, sep);
+
+  uint64_t requested = 0;
+
+  int i = 0; 
+  while (i < 4 && p) {
+    // printf("Arg %d: '%s'\n", i, p);
+    
+    // start address 
+    if (i == 1) {
+      uint64_t tmp_requested = atoi(p); // todo change this shit to uint64_t
+      if (tmp_requested) {
+        requested = tmp_requested;
+      }
+    }
+  }
+
+  if (!requested) {
+    fprintf(stderr, "Cannot alloc 0 bytes\n");
+    return;
+  }
+
+  printf("[d] Have to alloc %lu bytes\n", requested);
+  for (int i = 0; i < list->num_lists; ++i) {
+    if (!list->array[i]) {
+      fprintf(stderr, "[WARN] Skipping list %d, not alloc'd\n", i);
+      continue;
+    }
+
+    // todo add list sizes and refactor code to have a LL structure separate from nodes
+    // may god help me
   }
 }
 
@@ -125,6 +176,9 @@ int main() {
     }
     else if (starts_with(cmd, "PRINT")) {
       handle_print(cmd, list);
+    }
+    else if (starts_with(cmd, "MALLOC")) {
+      handle_malloc(cmd, list);
     }
   }
 
