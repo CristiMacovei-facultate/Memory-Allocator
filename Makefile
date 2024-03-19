@@ -1,9 +1,11 @@
-build: main.c
-	gcc -o sfl main.c
+FILES = main.c arraylist.c
 
-run: main.c
+build: $(FILES)
+	gcc -o sfl $(FILES)
+
+run: $(FILES)
 	make build
 	./sfl
 
-bd: main.c
-	gcc -g -Wall -Wextra -pedantic -o sfl main.c 
+bd: $(FILES)
+	gcc -g -Wall -Wextra -pedantic -o sfl $(FILES)

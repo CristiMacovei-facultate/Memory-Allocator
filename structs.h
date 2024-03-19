@@ -1,6 +1,9 @@
-#pragma once
+#ifndef STRUCTS_H_GUARD
+#define STRUCTS_H_GUARD
 
 #include <stdint.h>
+
+#include "arraylist.h"
 
 typedef struct dll_node {
   struct dll_node *next;
@@ -23,5 +26,7 @@ typedef struct sfl {
   uint64_t bytes_per_list;
   uint8_t type;
 
-  dll_t **dlls;
+  arraylist_t *dlls;
 } sfl_t;
+
+#endif
