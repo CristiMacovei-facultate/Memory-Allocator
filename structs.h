@@ -23,5 +23,5 @@ typedef struct sfl {
   uint64_t bytes_per_list;
   uint8_t type;
 
-  dll_t **array;
+  dll_t **dlls;
 } sfl_t;
