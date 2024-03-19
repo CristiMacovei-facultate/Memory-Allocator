@@ -68,7 +68,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   uint64_t addr = list->start_addr;
   for (int i = 0; i < num_lists; ++i) {
     uint64_t block_size = ((uint64_t)8 << i);
-    uint64_t num_blocks = bytes_per_list / block_size;
+    int num_blocks = bytes_per_list / block_size;
     // printf("Will alloc list of %lu blocks with %lu size each\n", num_blocks, block_size);
 
     list->dlls[i] = malloc(sizeof(dll_t));
@@ -174,6 +174,25 @@ void handle_malloc(char *cmd, sfl_t *list) {
   }
 }
 
+void handle_free(char *cmd, sfl_t **ptr_list) {
+  sfl_t *list = *ptr_list;
+  for (int i = 0; i < list->num_lists; ++i) {
+    for (dll_node_t *curr = list->dlls[i]->head; curr;) {
+      dll_node_t *tmp = curr;
+      curr = curr->next;
+
+      free(tmp);
+    }
+
+    free(list->dlls[i]);
+  }
+
+  free(list->dlls);
+  free(list);
+
+  *ptr_list = NULL;
+}
+
 int main() {
   char cmd[CMD_LINE];
 
@@ -194,6 +213,10 @@ int main() {
     }
     else if (starts_with(cmd, "MALLOC")) {
       handle_malloc(cmd, list);
+    }
+    else if (starts_with(cmd, "DESTROY_HEAP")) {
+      handle_free(cmd, &list);
+      return 0;
     }
   }
 
