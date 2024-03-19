@@ -120,6 +120,7 @@ void handle_print(char *cmd, sfl_t *list) {
   printf("SFL with %d lists\n", list->dlls->num_elements);
 
   for (int i = 0; i < list->dlls->num_elements; ++i) {
+    printf("On list %d, ptr = %p\n", i, ((dll_t *)al_get(list->dlls, i)));
     printf("List %d with size %lu: [", i, ((dll_t *)al_get(list->dlls, i))->block_size);
 
     for (dll_node_t *node = ((dll_t *)al_get(list->dlls, i))->head; node; node = node->next) {
@@ -141,19 +142,19 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
   uint64_t requested = 0;
 
-  int i = 0; 
-  while (i < 4 && p) {
+  int arg_index = 0; 
+  while (arg_index < 4 && p) {
     // printf("Arg %d: '%s'\n", i, p);
     
     // start address 
-    if (i == 1) {
+    if (arg_index == 1) {
       uint64_t tmp_requested = atoi(p); // todo change this shit to uint64_t
       if (tmp_requested) {
         requested = tmp_requested;
       }
     }
 
-    ++i;
+    ++arg_index;
     p = strtok(NULL, sep);
   }
 
@@ -184,15 +185,17 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
     dll_node_t *shard = malloc(sizeof(dll_node_t));
     shard->start_addr = mallocd_node->start_addr + requested;
+    shard->next = NULL;
+    shard->prev = NULL;
     size_t shard_size = dll->block_size - requested;
 
     //todo skep shenaningans if shard_size == 0
-    
-    free(mallocd_node);
 
     printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
     printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
     // printf("Remaining head on: %p\n", dll->head);
+
+    free(mallocd_node);
 
     // todo fragment block and move the shard to another dll (create if non-existent)
     
@@ -202,6 +205,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
     if (exact_match) {
       dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
+      shard->next = shard_dll->head;
       // todo write append functionality
       if (shard_dll->num_nodes == 0) {
         shard_dll->head = shard;
@@ -219,7 +223,10 @@ void handle_malloc(char *cmd, sfl_t *list) {
       shard_dll->num_nodes = 1;
       // printf("Before on %d dlls\n", list->dlls->num_elements);
       al_insert(list->dlls, shard_dll_idx, shard_dll);
-      // printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
+      for (int ii = 0; ii < list->dlls->num_elements; ++ii) {
+        printf("dll - %d\n", ((dll_t*)al_get(list->dlls, ii))->block_size);
+      }
+      printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
     }
 
     // todo implement structure to hold alloc'd blocks
