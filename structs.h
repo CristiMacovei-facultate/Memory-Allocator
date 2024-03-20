@@ -22,6 +22,8 @@ typedef struct doubly_linked_list {
 typedef struct block {
   size_t block_size;
   size_t start_addr;
+
+  void *data;
 } block_t;
 
 typedef struct sfl {

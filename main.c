@@ -25,6 +25,10 @@ int dll_greater_equal(const void* target_size, const void *a) {
   return ((dll_t*)a)->block_size >= (*(size_t*)target_size);
 }
 
+int block_address_equal(const void *addr, const void* block) {
+  return (*(size_t*)addr) == ((block_t*)block)->start_addr;
+}
+
 void handle_init(char *cmd, sfl_t **ptr_list) {
   char sep[] = " ";
   char *p = strtok(cmd, sep);
@@ -192,6 +196,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
     block_t *new_block = malloc(sizeof(block_t));
     new_block->block_size = requested;
     new_block->start_addr = mallocd_node->start_addr;
+    new_block->data = calloc(requested, sizeof(uint8_t));
 
     al_append(list->allocd_blocks, new_block);
     free(new_block);
@@ -239,8 +244,67 @@ void handle_malloc(char *cmd, sfl_t *list) {
   fprintf(stderr, "Out of memory.\n");
 }
 
+void handle_read(char *cmd, sfl_t *list) {
+  if (!list) {
+    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    return;
+  }
+
+  char sep[] = " ";
+  char *p = strtok(cmd, sep);
+
+  size_t addr = 0;
+  size_t num_bytes = 0;
+
+  int arg_index = 0; 
+  while (arg_index < 4 && p) {
+    // printf("Arg %d: '%s'\n", i, p);
+    
+    // start address 
+    if (arg_index == 1) {
+      size_t tmp_addr = atoll(p);
+      if (tmp_addr) {
+        addr = tmp_addr;
+      }
+    }
+    else if (arg_index == 2) {
+      size_t tmp_num_bytes = atoll(p);
+      if (tmp_num_bytes) {
+        num_bytes = tmp_num_bytes;
+      }
+    }
+
+    ++arg_index;
+    p = strtok(NULL, sep);
+  }
+
+  printf("Reading %lu bytes from address %lu\n", num_bytes, addr);
+
+  int target_block_idx = al_first_if(list->allocd_blocks, &addr, block_address_equal);
+  block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
+  int exact_match = target_block->start_addr == addr;
+
+  if (!exact_match) {
+    fprintf(stderr, "Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
+    return;
+  }
+
+  if (target_block->block_size < num_bytes) {
+    fprintf(stderr, "Segmentation Fault (can't read that many). Esti prost facut gramada\n");
+    return;
+  }
+
+  for (int i = 0; i < (int)num_bytes; ++i) {
+    uint8_t byte = *((uint8_t*)target_block->data);
+    printf("%02x ", byte);
+  }
+  printf("\n");
+}
+
 void handle_free(sfl_t **ptr_list) {  
   sfl_t *list = *ptr_list;
+
+  // free all elements of dll
   for (int i = 0; i < list->dlls->num_elements; ++i) {
     for (dll_node_t *curr = ((dll_t *)al_get(list->dlls, i))->head; curr;) {
       dll_node_t *tmp = curr;
@@ -248,6 +312,12 @@ void handle_free(sfl_t **ptr_list) {
 
       free(tmp);
     }
+  }
+
+  // free data contained in allocd blocks
+  for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
+    block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
+    free(b->data);
   }
 
   al_free(list->dlls);
@@ -277,6 +347,9 @@ int main() {
     }
     else if (starts_with(cmd, "MALLOC")) {
       handle_malloc(cmd, list);
+    }
+    else if (starts_with(cmd, "READ")) {
+      handle_read(cmd, list);
     }
     else if (starts_with(cmd, "DESTROY_HEAP")) {
       handle_free(&list);
