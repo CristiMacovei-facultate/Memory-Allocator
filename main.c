@@ -21,8 +21,8 @@ int starts_with(char *cmd, char *string) {
   return 1;
 }
 
-int dll_greater_than(const void* target_size, const void *a) {
-  return ((dll_t*)a)->block_size > (*(size_t*)target_size);
+int dll_greater_equal(const void* target_size, const void *a) {
+  return ((dll_t*)a)->block_size >= (*(size_t*)target_size);
 }
 
 void handle_init(char *cmd, sfl_t **ptr_list) {
@@ -206,14 +206,12 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
     //todo skip shenaningans if shard_size == 0
     
-    int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_than);
+    int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
     int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
-    printf("Shard of size %lu will be inserted in list %d (exact = %d)\n", shard_size, shard_dll_idx, exact_match);
+    printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
 
     if (exact_match) {
       dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
-      shard->next = shard_dll->head;
-      // todo write append functionality
       if (shard_dll->num_nodes == 0) {
         shard_dll->head = shard;
       }
