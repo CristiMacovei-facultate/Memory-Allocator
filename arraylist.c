@@ -27,7 +27,7 @@ void *al_get(arraylist_t *list, int index) {
 void al_insert(arraylist_t *list, int index, void *src) {
   list->num_elements++;
 
-  if (list->num_elements > list->capacity) {
+  if (list->num_elements > (int)list->capacity) {
     al_resize(list, list->capacity * 2);
   }
 
@@ -41,6 +41,10 @@ void al_insert(arraylist_t *list, int index, void *src) {
   memcpy(ptr, src, list->element_size);
 
   // printf("Now on %d dlls out of %lu\n", list->num_elements, list->capacity);
+}
+
+void al_append(arraylist_t *list, void *src) {
+  al_insert(list, list->num_elements, src);
 }
 
 void al_free(arraylist_t *list) {

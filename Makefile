@@ -1,7 +1,7 @@
 FILES = main.c arraylist.c
 
 build: $(FILES)
-	gcc -o sfl $(FILES)
+	gcc -Wall -Wextra -pedantic -o sfl $(FILES)
 
 run: $(FILES)
 	make build

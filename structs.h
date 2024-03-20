@@ -8,7 +8,6 @@
 typedef struct dll_node {
   struct dll_node *next;
   struct dll_node *prev;
-  // uint64_t block_size;
   uint64_t start_addr;
 } dll_node_t;
 
@@ -20,11 +19,17 @@ typedef struct doubly_linked_list {
   uint64_t block_size;
 } dll_t;
 
+typedef struct block {
+  size_t block_size;
+  size_t start_addr;
+} block_t;
+
 typedef struct sfl {
   uint64_t start_addr;
   uint8_t type;
 
-  arraylist_t *dlls;
+  arraylist_t *dlls; // arraylist of dll_t
+  arraylist_t *allocd_blocks; // array list of block_t 
 } sfl_t;
 
 #endif
