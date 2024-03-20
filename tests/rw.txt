@@ -1,0 +1,5 @@
+init_heap 0 1 8
+malloc 7
+write 0x0 nigger 6
+read 0x0 6
+destroy_heap

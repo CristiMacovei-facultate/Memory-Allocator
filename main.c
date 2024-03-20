@@ -10,6 +10,16 @@
 #include "structs.h"
 
 #define CMD_LINE 600
+/*
+char *strdup(char *str) {
+  size_t n = strlen(str);
+
+  char *ans = malloc(n);
+  memcpy(ans, str, n);
+
+  return ans;
+}
+*/
 
 size_t atox(char *str) {
   size_t ans = 0;
@@ -312,7 +322,7 @@ void handle_read(char *cmd, sfl_t *list) {
     
     // start address 
     if (arg_index == 1) {
-      size_t tmp_addr = atoll(p);
+      size_t tmp_addr = atox(p + 2);
       if (tmp_addr) {
         addr = tmp_addr;
       }
@@ -356,14 +366,18 @@ void handle_read(char *cmd, sfl_t *list) {
     return;
   }
 
+  int index = addr - target_block->start_addr;
   for (size_t i = 0; i < num_bytes; ++i) {
     if (i + addr >= target_block->start_addr + target_block->block_size) {
       ++target_block_idx;
       target_block = al_get(list->allocd_blocks, target_block_idx);
+      index = 0;
     }
     
-    uint8_t byte = *((uint8_t*)target_block->data);
-    printf("%02x ", byte);
+    uint8_t *ptr_byte = ((uint8_t*)target_block->data + index);
+    printf("%c", *ptr_byte);
+    
+    ++index;
   }
   printf("\n");
 }
@@ -451,6 +465,90 @@ void handle_free(char *cmd, sfl_t *list) {
   insert_new_shard(list, new_addr, new_size);
 }
 
+void handle_write(char *cmd, sfl_t *list) {
+  if (!list) {
+    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    return;
+  }
+
+  char sep[] = " ";
+  char *p = strtok(cmd, sep);
+
+  size_t addr = 0;
+  char *data;
+  size_t num_bytes = 0;
+
+  int arg_index = 0; 
+  while (arg_index < 4 && p) {
+    // printf("Arg %d: '%s'\n", i, p);
+    
+    // start address 
+    if (arg_index == 1) {
+      size_t tmp_addr = atox(p + 2);
+      if (tmp_addr) {
+        addr = tmp_addr;
+      }
+    }
+    else if (arg_index == 2) {
+      data = strdup(p);
+    }
+    else if (arg_index == 3) {
+      size_t tmp_num_bytes = atoll(p);
+      if (tmp_num_bytes) {
+        num_bytes = tmp_num_bytes;
+      }
+    }
+
+    ++arg_index;
+    p = strtok(NULL, sep);
+  }
+
+  printf("Will write %lu bytes of '%s' into addr %lx\n", num_bytes, data, addr);
+
+  int target_block_idx = al_last_if(list->allocd_blocks, &addr, block_address_less_equal);
+  block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
+  int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
+
+  if (!exact_match) {
+    fprintf(stderr, "Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
+    return;
+  }
+
+  size_t contiguous_until = target_block->start_addr + target_block->block_size;
+  printf("111 Initially contig until %lu\n", contiguous_until);
+  for (int i = target_block_idx + 1; i < list->allocd_blocks->num_elements; ++i) {
+    block_t *next_block = al_get(list->allocd_blocks, i);
+    if (next_block->start_addr == contiguous_until) {
+      contiguous_until = next_block->start_addr + next_block->block_size;
+      printf("contig until %lu\n", contiguous_until);
+    }
+    else {
+      break;
+    }
+  }
+  if (contiguous_until < addr + num_bytes) {
+    fprintf(stderr, "Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+    return;
+  }
+
+
+  int index = addr - target_block->start_addr;
+  for (size_t i = 0; i < num_bytes; ++i) {
+    if (i + addr >= target_block->start_addr + target_block->block_size) {
+      ++target_block_idx;
+      target_block = al_get(list->allocd_blocks, target_block_idx);
+      index = 0;
+    }
+    
+    uint8_t *ptr_byte = ((uint8_t*)target_block->data + index);
+    *ptr_byte = (uint8_t)data[i];
+
+    ++index;
+
+    printf("Wrote char %c on index %d\n", data[i], index);
+  }
+}
+
 int main() {
   char cmd[CMD_LINE];
 
@@ -474,6 +572,9 @@ int main() {
     }
     else if (starts_with(cmd, "READ")) {
       handle_read(cmd, list);
+    }
+    else if (starts_with(cmd, "WRITE")) {
+      handle_write(cmd, list);
     }
     else if (starts_with(cmd, "FREE")) {
       handle_free(cmd, list);
