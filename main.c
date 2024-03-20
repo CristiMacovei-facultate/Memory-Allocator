@@ -26,8 +26,12 @@ int dll_greater_equal(const void* target_size, const void *a) {
   return ((dll_t*)a)->block_size >= (*(size_t*)target_size);
 }
 
-int block_address_equal(const void *addr, const void* block) {
-  return (*(size_t*)addr) == ((block_t*)block)->start_addr;
+int block_address_less_equal(const void *addr, const void* block) {
+  return (*(size_t*)addr) >= ((block_t*)block)->start_addr;
+}
+
+int block_address_greater(const void *addr, const void* block) {
+  return ((block_t*)block)->start_addr > (*(size_t*)addr);
 }
 
 void handle_init(char *cmd, sfl_t **ptr_list) {
@@ -194,13 +198,14 @@ void handle_malloc(char *cmd, sfl_t *list) {
     printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
 
     // append new block to arraylist for alloc'd blocks
-    // todo make it append the block so that list stays increasing
+    // it's done in a way so that the list stays sorted in increasing order
     block_t *new_block = malloc(sizeof(block_t));
     new_block->block_size = requested;
     new_block->start_addr = mallocd_node->start_addr;
     new_block->data = calloc(requested, sizeof(uint8_t));
 
-    al_append(list->allocd_blocks, new_block);
+    int block_idx = al_first_if(list->allocd_blocks, &(new_block->start_addr), block_address_greater);
+    al_insert(list->allocd_blocks, block_idx, new_block);
     free(new_block);
 
     dll_node_t *shard = malloc(sizeof(dll_node_t));
@@ -286,19 +291,16 @@ void handle_read(char *cmd, sfl_t *list) {
   printf("Reading %lu bytes from address %lu\n", num_bytes, addr);
 
   // todo make this work if data is split between multiple blocks
-  int target_block_idx = al_first_if(list->allocd_blocks, &addr, block_address_equal);
+  int target_block_idx = al_last_if(list->allocd_blocks, &addr, block_address_less_equal);
   block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
-  int exact_match = target_block->start_addr == addr;
+  int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
 
   if (!exact_match) {
     fprintf(stderr, "Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
     return;
   }
 
-  if (target_block->block_size < num_bytes) {
-    fprintf(stderr, "Segmentation Fault (can't read that many). Esti prost facut gramada\n");
-    return;
-  }
+  //todo check if there's blocks for all bytes
 
   for (int i = 0; i < (int)num_bytes; ++i) {
     uint8_t byte = *((uint8_t*)target_block->data);

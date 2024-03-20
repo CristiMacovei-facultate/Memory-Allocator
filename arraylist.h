@@ -22,5 +22,6 @@ void al_append(arraylist_t *list, void *src);
 void al_free(arraylist_t *list);
 
 int al_first_if(arraylist_t *list, void *target, int cmp(const void*, const void*));
+int al_last_if(arraylist_t *list, void *target, int cmp(const void*, const void*));
 
 #endif

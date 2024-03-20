@@ -63,3 +63,19 @@ int al_first_if(arraylist_t *list, void *target, int cmp(const void*, const void
 
   return list->num_elements;
 }
+
+int al_last_if(arraylist_t *list, void *target, int cmp(const void*, const void*)) {
+  int ans = 0;
+  for (int i = 0; i < list->num_elements; ++i) {
+    void *curr = al_get(list, i);
+    if (cmp(target, curr) == 1) {
+      ans = i;
+    }
+    // todo remove this if needed
+    else {
+      break;
+    }
+  }
+
+  return ans;
+}
