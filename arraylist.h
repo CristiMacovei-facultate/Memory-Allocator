@@ -24,4 +24,6 @@ void al_free(arraylist_t *list);
 int al_first_if(arraylist_t *list, void *target, int cmp(const void*, const void*));
 int al_last_if(arraylist_t *list, void *target, int cmp(const void*, const void*));
 
+void al_erase(arraylist_t *list, int index);
+
 #endif

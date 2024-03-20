@@ -79,3 +79,26 @@ int al_last_if(arraylist_t *list, void *target, int cmp(const void*, const void*
 
   return ans;
 }
+
+void al_erase(arraylist_t *list, int index) {
+  if (list->num_elements == 0) {
+    return;
+  }
+
+  list->num_elements--;
+  if (index < list->num_elements) {
+    for (int i = index; i < list->num_elements; ++i) {
+      void* first = al_get(list, i);
+      void* next = al_get(list, i + 1);
+
+      memcpy(first, next, list->element_size);
+    }
+
+    void *last = al_get(list, list->num_elements);
+    free(last);
+  }
+
+  if (list->num_elements > 0 && (size_t)list->num_elements * 2 < list->capacity) {
+    al_resize(list, list->capacity / 2);
+  }
+}

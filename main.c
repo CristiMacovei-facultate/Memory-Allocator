@@ -11,6 +11,14 @@
 
 #define CMD_LINE 600
 
+size_t atox(char *str) {
+  size_t ans = 0;
+  for (size_t i = 0; i < strlen(str); ++i) {
+    ans = ans * 16 + (str[i] - '0');
+  }
+  return ans;
+}
+
 int starts_with(char *cmd, char *string) {
   int n = strlen(string);
   for (int i = 0; i < n; ++i) {
@@ -32,6 +40,40 @@ int block_address_less_equal(const void *addr, const void* block) {
 
 int block_address_greater(const void *addr, const void* block) {
   return ((block_t*)block)->start_addr > (*(size_t*)addr);
+}
+
+void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size) {
+  dll_node_t *shard = malloc(sizeof(dll_node_t));
+  shard->start_addr = shard_addr;
+  shard->next = NULL;
+  shard->prev = NULL;
+
+  int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
+  int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
+  printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
+
+  if (exact_match) {
+    dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
+    if (shard_dll->num_nodes == 0) {
+      shard_dll->head = shard;
+    } else {
+      shard_dll->tail->next = shard;
+    }
+    shard_dll->tail = shard;
+    shard_dll->num_nodes++;
+  }
+  else {
+    // printf("Non exact match, will insert on index %d\n", shard_dll_idx);
+    dll_t *shard_dll = malloc(sizeof(dll_t));
+    shard_dll->head = shard;
+    shard_dll->tail = shard;
+    shard_dll->block_size = shard_size;
+    shard_dll->num_nodes = 1;
+    // printf("Before on %d dlls\n", list->dlls->num_elements);
+    al_insert(list->dlls, shard_dll_idx, shard_dll);
+    free(shard_dll);
+    printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
+  }
 }
 
 void handle_init(char *cmd, sfl_t **ptr_list) {
@@ -123,7 +165,6 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   *ptr_list = list;
 }
 
-// todo make this print with the MEMORY_DUMP syntax from assignment
 void handle_print(sfl_t *list) {
   printf("+++++DUMP+++++\n");
 
@@ -233,46 +274,18 @@ void handle_malloc(char *cmd, sfl_t *list) {
     al_insert(list->allocd_blocks, block_idx, new_block);
     free(new_block);
 
-    dll_node_t *shard = malloc(sizeof(dll_node_t));
-    shard->start_addr = mallocd_node->start_addr + requested;
-    shard->next = NULL;
-    shard->prev = NULL;
-    size_t shard_size = dll->block_size - requested;
 
+    size_t shard_addr = mallocd_node->start_addr + requested;
+    size_t shard_size = dll->block_size - requested;
+    
     free(mallocd_node);
 
     if (shard_size > 0) {
-      (list->num_fragmentations)++;
-
-      int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
-      int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
-      printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
-
-      if (exact_match) {
-        dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
-        if (shard_dll->num_nodes == 0) {
-          shard_dll->head = shard;
-        } else {
-          shard_dll->tail->next = shard;
-        }
-        shard_dll->tail = shard;
-        shard_dll->num_nodes++;
-      }
-      else {
-        // printf("Non exact match, will insert on index %d\n", shard_dll_idx);
-        dll_t *shard_dll = malloc(sizeof(dll_t));
-        shard_dll->head = shard;
-        shard_dll->tail = shard;
-        shard_dll->block_size = shard_size;
-        shard_dll->num_nodes = 1;
-        // printf("Before on %d dlls\n", list->dlls->num_elements);
-        al_insert(list->dlls, shard_dll_idx, shard_dll);
-        free(shard_dll);
-        printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
-      }
+      list->num_fragmentations++;
+      insert_new_shard(list, shard_addr, shard_size);
     }
     else {
-      fprintf(stderr, "Shard size zero, skipping\n");
+      fprintf(stderr, "Shard size zero, skipping.\n");
     }
 
     return;
@@ -317,7 +330,6 @@ void handle_read(char *cmd, sfl_t *list) {
 
   printf("Reading %lu bytes from address %lu\n", num_bytes, addr);
 
-  // todo make this work if data is split between multiple blocks
   int target_block_idx = al_last_if(list->allocd_blocks, &addr, block_address_less_equal);
   block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
   int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
@@ -356,7 +368,7 @@ void handle_read(char *cmd, sfl_t *list) {
   printf("\n");
 }
 
-void handle_free(sfl_t **ptr_list) {  
+void handle_destroy(sfl_t **ptr_list) {  
   sfl_t *list = *ptr_list;
 
   // free all elements of dll
@@ -380,6 +392,63 @@ void handle_free(sfl_t **ptr_list) {
   free(list);
 
   *ptr_list = NULL;
+}
+
+void handle_free(char *cmd, sfl_t *list) {
+  if (!list) {
+    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    return;
+  }
+
+  char sep[] = " ";
+  char *p = strtok(cmd, sep);
+
+  size_t addr = 0;
+
+  int arg_index = 0; 
+  while (arg_index < 4 && p) {
+    // printf("Arg %d: '%s'\n", i, p);
+    
+    // start address 
+    if (arg_index == 1) {
+      size_t tmp_addr = atox(p + 2);
+      if (tmp_addr) {
+        addr = tmp_addr;
+      }
+    }
+
+    ++arg_index;
+    p = strtok(NULL, sep);
+  }
+
+  printf("Freeing address 0x%lx (%ld)\n", addr, addr);
+
+  int block_idx = al_first_if(list->allocd_blocks, &addr, block_address_greater) - 1;
+
+  if (block_idx < 0) {
+    fprintf(stderr, "Invalid free.\n");
+    return;
+  }
+
+  block_t *block = al_get(list->allocd_blocks, block_idx);
+
+  if (block->start_addr != addr) {
+    fprintf(stderr, "Invalid free.\n");
+    return;
+  }
+
+  printf("Freeing from index %d\n", block_idx);
+
+  size_t new_addr = block->start_addr;
+  size_t new_size = block->block_size;
+
+  printf("A bubuit.\n");
+
+  al_erase(list->allocd_blocks, block_idx);
+
+  printf("A bubuit v2.\n");
+
+  insert_new_shard(list, new_addr, new_size);
 }
 
 int main() {
@@ -406,8 +475,11 @@ int main() {
     else if (starts_with(cmd, "READ")) {
       handle_read(cmd, list);
     }
+    else if (starts_with(cmd, "FREE")) {
+      handle_free(cmd, list);
+    }
     else if (starts_with(cmd, "DESTROY_HEAP")) {
-      handle_free(&list);
+      handle_destroy(&list);
       return 0;
     }
   }
