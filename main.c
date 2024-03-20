@@ -300,9 +300,29 @@ void handle_read(char *cmd, sfl_t *list) {
     return;
   }
 
-  //todo check if there's blocks for all bytes
+  size_t contiguous_until = target_block->start_addr + target_block->block_size;
+  printf("Initially contig until %lu\n", contiguous_until);
+  for (int i = target_block_idx + 1; i < list->allocd_blocks->num_elements; ++i) {
+    block_t *next_block = al_get(list->allocd_blocks, i);
+    if (next_block->start_addr == contiguous_until) {
+      contiguous_until = next_block->start_addr + next_block->block_size;
+      printf("contig until %lu\n", contiguous_until);
+    }
+    else {
+      break;
+    }
+  }
+  if (contiguous_until < addr + num_bytes) {
+    fprintf(stderr, "Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+    return;
+  }
 
-  for (int i = 0; i < (int)num_bytes; ++i) {
+  for (size_t i = 0; i < num_bytes; ++i) {
+    if (i + addr >= target_block->start_addr + target_block->block_size) {
+      ++target_block_idx;
+      target_block = al_get(list->allocd_blocks, target_block_idx);
+    }
+    
     uint8_t byte = *((uint8_t*)target_block->data);
     printf("%02x ", byte);
   }
