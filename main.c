@@ -1,19 +1,20 @@
+// todo add debug mode
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "arraylist.h"
 #include "structs.h"
 
-//todo figure out how to do this shit without static buffers
-// -20 points if not
-#define CMD_LINE 256
+#define CMD_LINE 600
 
 int starts_with(char *cmd, char *string) {
   int n = strlen(string);
   for (int i = 0; i < n; ++i) {
-    if (cmd[i] != string[i]) {
+    if (tolower(cmd[i]) != tolower(string[i])) {
       return 0;
     }
   }
@@ -33,17 +34,15 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   char sep[] = " ";
   char *p = strtok(cmd, sep);
 
-  uint64_t start_addr = 0;
+  size_t start_addr = 0;
   int num_lists = 8;
-  uint64_t bytes_per_list = 1024;
+  size_t bytes_per_list = 1024;
 
   int i = 0; 
   while (i < 4 && p) {
-    // printf("Arg %d: '%s'\n", i, p);
-    
     // start address 
     if (i == 1) {
-      uint64_t tmp_start_addr = atoi(p); // todo change this shit to uint64_t
+      size_t tmp_start_addr = atol(p); 
       if (tmp_start_addr) {
         start_addr = tmp_start_addr;
       }
@@ -57,7 +56,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
     }
     // bytes per list
     else if (i == 3) {
-      uint64_t tmp_bpl = atoi(p); // todo also change this to uitn64_t
+      size_t tmp_bpl = atol(p);
       if (tmp_bpl) {
         bytes_per_list = tmp_bpl;
       }
@@ -74,9 +73,9 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   list->dlls = al_create(num_lists, sizeof(dll_t));
   list->allocd_blocks = al_create(1, sizeof(block_t));
 
-  uint64_t addr = list->start_addr;
+  size_t addr = list->start_addr;
   for (int i = 0; i < num_lists; ++i) {
-    uint64_t block_size = ((uint64_t)8 << i);
+    size_t block_size = ((size_t)8 << i);
     int num_blocks = bytes_per_list / block_size;
     // printf("Will alloc list of %lu blocks with %lu size each\n", num_blocks, block_size);
 
@@ -118,6 +117,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   *ptr_list = list;
 }
 
+// todo make this print with the MEMORY_DUMP syntax from assignment
 void handle_print(sfl_t *list) {
   printf("----------\n");
   printf("SFL with %d lists\n", list->dlls->num_elements);
@@ -147,7 +147,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
   char sep[] = " ";
   char *p = strtok(cmd, sep);
 
-  uint64_t requested = 0;
+  size_t requested = 0;
 
   int arg_index = 0; 
   while (arg_index < 4 && p) {
@@ -155,7 +155,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
     
     // start address 
     if (arg_index == 1) {
-      uint64_t tmp_requested = atoi(p); // todo change this shit to uint64_t
+      size_t tmp_requested = atol(p);
       if (tmp_requested) {
         requested = tmp_requested;
       }
@@ -193,6 +193,8 @@ void handle_malloc(char *cmd, sfl_t *list) {
     printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
     printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
 
+    // append new block to arraylist for alloc'd blocks
+    // todo make it append the block so that list stays increasing
     block_t *new_block = malloc(sizeof(block_t));
     new_block->block_size = requested;
     new_block->start_addr = mallocd_node->start_addr;
@@ -209,33 +211,36 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
     free(mallocd_node);
 
-    //todo skip shenaningans if shard_size == 0
-    
-    int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
-    int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
-    printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
+    if (shard_size > 0) {
+      int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
+      int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
+      printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
 
-    if (exact_match) {
-      dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
-      if (shard_dll->num_nodes == 0) {
-        shard_dll->head = shard;
-      } else {
-        shard_dll->tail->next = shard;
+      if (exact_match) {
+        dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
+        if (shard_dll->num_nodes == 0) {
+          shard_dll->head = shard;
+        } else {
+          shard_dll->tail->next = shard;
+        }
+        shard_dll->tail = shard;
+        shard_dll->num_nodes++;
       }
-      shard_dll->tail = shard;
-      shard_dll->num_nodes++;
+      else {
+        // printf("Non exact match, will insert on index %d\n", shard_dll_idx);
+        dll_t *shard_dll = malloc(sizeof(dll_t));
+        shard_dll->head = shard;
+        shard_dll->tail = shard;
+        shard_dll->block_size = shard_size;
+        shard_dll->num_nodes = 1;
+        // printf("Before on %d dlls\n", list->dlls->num_elements);
+        al_insert(list->dlls, shard_dll_idx, shard_dll);
+        free(shard_dll);
+        printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
+      }
     }
     else {
-      // printf("Non exact match, will insert on index %d\n", shard_dll_idx);
-      dll_t *shard_dll = malloc(sizeof(dll_t));
-      shard_dll->head = shard;
-      shard_dll->tail = shard;
-      shard_dll->block_size = shard_size;
-      shard_dll->num_nodes = 1;
-      // printf("Before on %d dlls\n", list->dlls->num_elements);
-      al_insert(list->dlls, shard_dll_idx, shard_dll);
-      free(shard_dll);
-      printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
+      fprintf(stderr, "Shard size zero, skipping\n");
     }
 
     return;
@@ -280,6 +285,7 @@ void handle_read(char *cmd, sfl_t *list) {
 
   printf("Reading %lu bytes from address %lu\n", num_bytes, addr);
 
+  // todo make this work if data is split between multiple blocks
   int target_block_idx = al_first_if(list->allocd_blocks, &addr, block_address_equal);
   block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
   int exact_match = target_block->start_addr == addr;
