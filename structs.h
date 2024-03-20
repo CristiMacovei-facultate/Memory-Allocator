@@ -22,8 +22,6 @@ typedef struct doubly_linked_list {
 
 typedef struct sfl {
   uint64_t start_addr;
-  int num_lists;
-  uint64_t bytes_per_list;
   uint8_t type;
 
   arraylist_t *dlls;

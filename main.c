@@ -65,8 +65,6 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 
   sfl_t *list = malloc(sizeof(sfl_t));
   list->start_addr = start_addr;
-  list->num_lists = num_lists;
-  list->bytes_per_list = bytes_per_list;
   list->type = 0; //todo change this in the future
   
   list->dlls = al_create(num_lists, sizeof(dll_t));
@@ -223,6 +221,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
       shard_dll->num_nodes = 1;
       // printf("Before on %d dlls\n", list->dlls->num_elements);
       al_insert(list->dlls, shard_dll_idx, shard_dll);
+      free(shard_dll);
       for (int ii = 0; ii < list->dlls->num_elements; ++ii) {
         printf("dll - %d\n", ((dll_t*)al_get(list->dlls, ii))->block_size);
       }
@@ -239,7 +238,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
 void handle_free(char *cmd, sfl_t **ptr_list) {
   sfl_t *list = *ptr_list;
-  for (int i = 0; i < list->num_lists; ++i) {
+  for (int i = 0; i < list->dlls->num_elements; ++i) {
     for (dll_node_t *curr = ((dll_t *)al_get(list->dlls, i))->head; curr;) {
       dll_node_t *tmp = curr;
       curr = curr->next;
