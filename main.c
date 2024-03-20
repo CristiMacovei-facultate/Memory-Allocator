@@ -77,6 +77,8 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   list->dlls = al_create(num_lists, sizeof(dll_t));
   list->allocd_blocks = al_create(1, sizeof(block_t));
 
+  list->total_mem = bytes_per_list * num_lists;
+
   size_t addr = list->start_addr;
   for (int i = 0; i < num_lists; ++i) {
     size_t block_size = ((size_t)8 << i);
@@ -123,23 +125,44 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 
 // todo make this print with the MEMORY_DUMP syntax from assignment
 void handle_print(sfl_t *list) {
-  printf("----------\n");
-  printf("SFL with %d lists\n", list->dlls->num_elements);
+  printf("+++++DUMP+++++\n");
+
+  printf("Total memory: %lu bytes\n", list->total_mem);
+  printf("Total allocated memory: %lu bytes\n", list->total_allocd);
+  printf("Total free memory: %lu bytes\n", list->total_mem - list->total_allocd);
+
+  int num_free_blocks = 0;
+  for (int i = 0; i < list->dlls->num_elements; ++i) {
+    dll_t* dll = al_get(list->dlls, i);
+    num_free_blocks += dll->num_nodes;
+  }
+  printf("Number of free blocks: %d\n", num_free_blocks);
+
+  printf("Number of allocated blocks: %d\n", list->allocd_blocks->num_elements);
+  printf("Number of malloc calls: %d\n", list->num_allocs);
+  printf("Number of fragmentations: %d\n", list->num_fragmentations);
+  printf("Number of free calls: %d\n", list->num_frees);
 
   for (int i = 0; i < list->dlls->num_elements; ++i) {
-    printf("List %d with size %lu: [", i, ((dll_t *)al_get(list->dlls, i))->block_size);
+    dll_t *dll = ((dll_t *)al_get(list->dlls, i));
 
-    for (dll_node_t *node = ((dll_t *)al_get(list->dlls, i))->head; node; node = node->next) {
-      printf("(addr = %lu), ", node->start_addr);
+    if (dll->num_nodes > 0) {
+      printf("Blocks with %lu bytes: %d free block(s) - ", dll->block_size, dll->num_nodes);
+
+      for (dll_node_t *node = dll->head; node; node = node->next) {
+        printf("0x%lx ", node->start_addr);
+      }
+      printf("\n");
     }
-    printf("]\n");
   }
-  printf("Alloc'd blocks: %d\n", list->allocd_blocks->num_elements);
+  printf("Allocated blocks: ");
   for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
     block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
-    printf("Block [%d]: size = %lu, addr = %lu\n", i, b->block_size, b->start_addr);
+    printf("(0x%lx - %lu) ", b->start_addr, b->block_size);
   }
-  printf("----------\n");
+  printf("\n");
+
+  printf("-----DUMP-----\n");
 }
 
 void handle_malloc(char *cmd, sfl_t *list) {
@@ -203,6 +226,8 @@ void handle_malloc(char *cmd, sfl_t *list) {
     new_block->block_size = requested;
     new_block->start_addr = mallocd_node->start_addr;
     new_block->data = calloc(requested, sizeof(uint8_t));
+    (list->num_allocs)++;
+    (list->total_allocd) += requested;
 
     int block_idx = al_first_if(list->allocd_blocks, &(new_block->start_addr), block_address_greater);
     al_insert(list->allocd_blocks, block_idx, new_block);
@@ -217,6 +242,8 @@ void handle_malloc(char *cmd, sfl_t *list) {
     free(mallocd_node);
 
     if (shard_size > 0) {
+      (list->num_fragmentations)++;
+
       int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
       int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
       printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);

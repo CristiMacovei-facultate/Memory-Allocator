@@ -32,6 +32,13 @@ typedef struct sfl {
 
   arraylist_t *dlls; // arraylist of dll_t
   arraylist_t *allocd_blocks; // array list of block_t 
+
+  // for memdump
+  size_t total_mem;
+  size_t total_allocd;
+  int num_allocs;
+  int num_frees;
+  int num_fragmentations;
 } sfl_t;
 
 #endif
