@@ -214,8 +214,9 @@ void handle_malloc(char *cmd, sfl_t *list) {
       dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
       if (shard_dll->num_nodes == 0) {
         shard_dll->head = shard;
+      } else {
+        shard_dll->tail->next = shard;
       }
-      shard_dll->tail->next = shard;
       shard_dll->tail = shard;
       shard_dll->num_nodes++;
     }
