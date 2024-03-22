@@ -12,7 +12,6 @@
 
 #define CMD_LINE 600
 
-/*
 char *strdup(char *str) {
   size_t n = strlen(str);
 
@@ -21,10 +20,11 @@ char *strdup(char *str) {
 
   return ans;
 }
-*/
 
 size_t atox(char *str) {
+#ifdef DEBUG_MODE
   printf("Passing %s into this shitty function\n", str);
+#endif 
 
   size_t ans = 0;
   size_t n = strlen(str);
@@ -69,18 +69,25 @@ void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size) {
 
   int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
   int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
+
+#ifdef DEBUG_MODE
   printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
+#endif
 
   if (exact_match) {
     dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
-    dll_insert_last(shard_dll, shard);
+    // dll_insert_last(shard_dll, shard);
+    dll_insert_before_first_if(shard_dll, shard); // todo make this ADT
   }
   else {
     dll_t *shard_dll = dll_create_from_node(shard_size, shard);
     // printf("Before on %d dlls\n", list->dlls->num_elements);
     al_insert(list->dlls, shard_dll_idx, shard_dll);
     free(shard_dll);
+
+#ifdef DEBUG_MODE
     printf("Now on %d dlls out of %lu\n", list->dlls->num_elements, list->dlls->capacity);
+#endif
   }
 }
 
@@ -96,7 +103,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   while (i < 4 && p) {
     // start address 
     if (i == 1) {
-      size_t tmp_start_addr = atol(p); 
+      size_t tmp_start_addr = atox(p + 2); 
       if (tmp_start_addr) {
         start_addr = tmp_start_addr;
       }
@@ -129,17 +136,27 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 
   list->total_mem = bytes_per_list * num_lists;
 
+  list->num_allocs = 0;
+  list->num_fragmentations = 0;
+  list->num_frees = 0;
+  list->total_allocd = 0;
+
   size_t addr = list->start_addr;
   for (int i = 0; i < num_lists; ++i) {
     size_t block_size = ((size_t)8 << i);
     int num_blocks = bytes_per_list / block_size;
-    // printf("Will alloc list of %lu blocks with %lu size each\n", num_blocks, block_size);
 
-    // printf("block size = %lu\n", block_size);
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] Will alloc list of %d blocks with %lu size each\n", num_blocks, block_size);
+  #endif 
+
     dll_t *tmp = dll_create_empty(block_size);
     al_insert(list->dlls, i, tmp);
     free(tmp);
-    // printf("set to %lu\n", ((dll_t *)al_get(list->dlls, i))->block_size);
+
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] set to %lu\n", ((dll_t *)al_get(list->dlls, i))->block_size);
+  #endif
 
     dll_t *dll = ((dll_t *)al_get(list->dlls, i));
     for (int j = 0; j < num_blocks; ++j) {
@@ -153,7 +170,9 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
     }
   }
 
+#ifdef DEBUG_MODE
   printf("Finished alloc, num lists: %d\n", list->dlls->num_elements);
+#endif 
 
   *ptr_list = list;
 }
@@ -170,7 +189,7 @@ void handle_print(sfl_t *list) {
     dll_t* dll = al_get(list->dlls, i);
     num_free_blocks += dll->num_nodes;
   }
-  printf("Number of free blocks: %d\n", num_free_blocks);
+  printf("Free blocks: %d\n", num_free_blocks);
 
   printf("Number of allocated blocks: %d\n", list->allocd_blocks->num_elements);
   printf("Number of malloc calls: %d\n", list->num_allocs);
@@ -180,23 +199,21 @@ void handle_print(sfl_t *list) {
   for (int i = 0; i < list->dlls->num_elements; ++i) {
     dll_t *dll = ((dll_t *)al_get(list->dlls, i));
 
-    printf("Now printing list with %lu size (%d nodes)\n", dll->block_size, dll->num_nodes);
-
     if (dll->num_nodes > 0) {
-      printf("Blocks with %lu bytes: %d free block(s) - ", dll->block_size, dll->num_nodes);
+      printf("Blocks with %lu bytes - %d free block(s) :", dll->block_size, dll->num_nodes);
 
       dll_node_t *node = dll->head;
       do {
-        printf("%lu ", node->start_addr);
+        printf(" 0x%lx", node->start_addr);
         node = node->next;
       } while (node != dll->head);
       printf("\n");
     }
   }
-  printf("Allocated blocks: ");
+  printf("Allocated blocks :");
   for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
     block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
-    printf("(%lu - %lu) ", b->start_addr, b->block_size);
+    printf(" (0x%lx - %lu)", b->start_addr, b->block_size);
   }
   printf("\n");
 
@@ -215,8 +232,10 @@ void handle_malloc(char *cmd, sfl_t *list) {
   size_t requested = 0;
 
   int arg_index = 0; 
-  while (arg_index < 4 && p) {
-    // printf("Arg %d: '%s'\n", i, p);
+  while (arg_index < 2 && p) {
+  #ifdef DEBUG_MODE
+    printf("Malloc arg [%d]: '%s'\n", arg_index, p);
+  #endif
     
     // start address 
     if (arg_index == 1) {
@@ -235,13 +254,21 @@ void handle_malloc(char *cmd, sfl_t *list) {
     return;
   }
 
-  // printf("[d] Have to alloc %lu bytes\n", requested);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Have to alloc %lu bytes\n", requested);
+#endif
+
   for (int i = 0; i < list->dlls->num_elements; ++i) {
-    // printf("[d] Searching on list %d\n", i);
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] Searching on list %d\n", i);
+  #endif 
     dll_t *dll = al_get(list->dlls, i);
 
     if (dll->num_nodes == 0) {
-      // fprintf(stderr, "[WARN] Skipping list %d, zero blocks remaining\n", i);
+    #ifdef DEBUG_MODE
+      printf("[DEBUG] Skipping list %d, zero blocks remaining\n", i);
+    #endif 
+
       continue;
     }
 
@@ -251,12 +278,11 @@ void handle_malloc(char *cmd, sfl_t *list) {
 
     // alloc head of dll
     dll_node_t *mallocd_node = dll_pop_first(dll);
-    
-    // dll->head = dll->head->next;
-    // dll->num_nodes--;
 
+  #ifdef DEBUG_MODE
     printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
     printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
+  #endif 
 
     // append new block to arraylist for alloc'd blocks
     // it's done in a way so that the list stays sorted in increasing order
@@ -280,9 +306,11 @@ void handle_malloc(char *cmd, sfl_t *list) {
       list->num_fragmentations++;
       insert_new_shard(list, shard_addr, shard_size);
     }
+  #ifdef DEBUG_MODE
     else {
-      fprintf(stderr, "Shard size zero, skipping.\n");
+      printf("[DEBUG] Shard size zero, skipping.\n");
     }
+  #endif
 
     return;
   }
@@ -324,7 +352,9 @@ void handle_read(char *cmd, sfl_t *list) {
     p = strtok(NULL, sep);
   }
 
-  printf("Reading %lu bytes from address %lu\n", num_bytes, addr);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Reading %lu bytes from address %lu\n", num_bytes, addr);
+#endif
 
   int target_block_idx = al_last_if(list->allocd_blocks, &addr, block_address_less_equal);
   block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
@@ -336,19 +366,25 @@ void handle_read(char *cmd, sfl_t *list) {
   }
 
   size_t contiguous_until = target_block->start_addr + target_block->block_size;
-  printf("Initially contig until %lu\n", contiguous_until);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Initially contig until %lu\n", contiguous_until);
+#endif
   for (int i = target_block_idx + 1; i < list->allocd_blocks->num_elements; ++i) {
     block_t *next_block = al_get(list->allocd_blocks, i);
     if (next_block->start_addr == contiguous_until) {
       contiguous_until = next_block->start_addr + next_block->block_size;
+    #ifdef DEBUG_MODE
       printf("contig until %lu\n", contiguous_until);
+    #endif
     }
     else {
       break;
     }
   }
   if (contiguous_until < addr + num_bytes) {
-    fprintf(stderr, "Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+  #ifdef DEBUG_MODE
+    printf("Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+  #endif 
     return;
   }
 
@@ -373,12 +409,16 @@ void handle_destroy(sfl_t **ptr_list) {
 
   // free all elements of dll
   for (int i = 0; i < list->dlls->num_elements; ++i) {
-    for (dll_node_t *curr = ((dll_t *)al_get(list->dlls, i))->head; curr;) {
-      dll_node_t *tmp = curr;
-      curr = curr->next;
+    dll_t *dll = ((dll_t *)al_get(list->dlls, i));
+    dll_node_t *head = dll->head;
+    
+    dll_node_t *node = head;
+    do {
+      dll_node_t *tmp = node;
+      node = node->next;
 
       free(tmp);
-    }
+    } while (node != head);
   }
 
   // free data contained in allocd blocks
@@ -406,9 +446,11 @@ void handle_free(char *cmd, sfl_t *list) {
   size_t addr = 0;
 
   int arg_index = 0; 
-  while (arg_index < 4 && p) {
-    // printf("Arg %d: '%s'\n", i, p);
-    
+  while (arg_index < 2 && p) {
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] Free - arg [%d]: '%s'\n", arg_index, p);
+  #endif 
+
     // start address 
     if (arg_index == 1) {
       size_t tmp_addr = atox(p + 2);
@@ -421,7 +463,9 @@ void handle_free(char *cmd, sfl_t *list) {
     p = strtok(NULL, sep);
   }
 
-  printf("Freeing address 0x%lx (%ld)\n", addr, addr);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Freeing address 0x%lx (%ld)\n", addr, addr);
+#endif
 
   int block_idx = al_first_if(list->allocd_blocks, &addr, block_address_greater) - 1;
 
@@ -437,18 +481,20 @@ void handle_free(char *cmd, sfl_t *list) {
     return;
   }
 
-  printf("Freeing from index %d\n", block_idx);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Freeing from index %d\n", block_idx);
+#endif 
 
   size_t new_addr = block->start_addr;
   size_t new_size = block->block_size;
 
-  printf("A bubuit.\n");
-
+  free(block->data);
   al_erase(list->allocd_blocks, block_idx);
 
-  printf("A bubuit v2.\n");
-
   insert_new_shard(list, new_addr, new_size);
+
+  ++(list->num_frees);
+  list->total_allocd -= new_size;
 }
 
 void handle_write(char *cmd, sfl_t *list) {
@@ -466,7 +512,9 @@ void handle_write(char *cmd, sfl_t *list) {
 
   int arg_index = 0; 
   while (arg_index < 4 && p) {
-    // printf("Arg %d: '%s'\n", i, p);
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] Write - arg [%d]: '%s'\n", arg_index, p);
+  #endif 
     
     // start address 
     if (arg_index == 1) {
@@ -489,7 +537,9 @@ void handle_write(char *cmd, sfl_t *list) {
     p = strtok(NULL, sep);
   }
 
-  printf("Will write %lu bytes of '%s' into addr %lx\n", num_bytes, data, addr);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Will write %lu bytes of '%s' into addr %lx\n", num_bytes, data, addr);
+#endif 
 
   int target_block_idx = al_last_if(list->allocd_blocks, &addr, block_address_less_equal);
   block_t *target_block = al_get(list->allocd_blocks, target_block_idx);
@@ -501,12 +551,16 @@ void handle_write(char *cmd, sfl_t *list) {
   }
 
   size_t contiguous_until = target_block->start_addr + target_block->block_size;
-  printf("111 Initially contig until %lu\n", contiguous_until);
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Initially contig until %lu\n", contiguous_until);
+#endif 
   for (int i = target_block_idx + 1; i < list->allocd_blocks->num_elements; ++i) {
     block_t *next_block = al_get(list->allocd_blocks, i);
     if (next_block->start_addr == contiguous_until) {
       contiguous_until = next_block->start_addr + next_block->block_size;
+    #ifdef DEBUG_MODE
       printf("contig until %lu\n", contiguous_until);
+    #endif
     }
     else {
       break;
@@ -530,8 +584,9 @@ void handle_write(char *cmd, sfl_t *list) {
     *ptr_byte = (uint8_t)data[i];
 
     ++index;
-
-    printf("Wrote char %c on index %d\n", data[i], index);
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] Wrote char %c on index %d\n", data[i], index);
+  #endif 
   }
 }
 
@@ -550,7 +605,12 @@ int main() {
     if (starts_with(cmd, "INIT_HEAP")) {
       handle_init(cmd, &list);
     }
+    #ifdef DEBUG_MODE
     else if (starts_with(cmd, "PRINT")) {
+      handle_print(list);
+    }
+    #endif
+    else if (starts_with(cmd, "DUMP_MEMORY")) {
       handle_print(list);
     }
     else if (starts_with(cmd, "MALLOC")) {

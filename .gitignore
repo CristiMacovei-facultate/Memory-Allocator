@@ -3,3 +3,11 @@ sfl
 
 # vscode
 .vscode/
+
+# checker files
+.check.grade
+check
+install.sh
+check_utils/
+cs/
+tasks/

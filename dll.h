@@ -29,6 +29,8 @@ void dll_insert_first(dll_t *list, dll_node_t *new_node);
 
 void dll_insert_last(dll_t *list, dll_node_t *new_node);
 
+void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node);
+
 dll_node_t *dll_pop_first(dll_t *list);
 
 #endif
