@@ -94,7 +94,9 @@ void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node) {
   node->prev->next = new_node;
   node->prev = new_node;
 
-  if (node == list->head) {
+  // second condition needed because case when no element has a higher address than target
+  // and it would insert before head
+  if (node == list->head && node->start_addr > new_node->start_addr) {
     list->head = new_node;
   }
 }
