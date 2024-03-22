@@ -6,10 +6,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#include "dll.h"
 #include "arraylist.h"
 #include "structs.h"
 
 #define CMD_LINE 600
+
 /*
 char *strdup(char *str) {
   size_t n = strlen(str);
@@ -22,9 +24,16 @@ char *strdup(char *str) {
 */
 
 size_t atox(char *str) {
+  printf("Passing %s into this shitty function\n", str);
+
   size_t ans = 0;
-  for (size_t i = 0; i < strlen(str); ++i) {
-    ans = ans * 16 + (str[i] - '0');
+  size_t n = strlen(str);
+  for (size_t i = 0; i < n; ++i) {
+    int digit = str[i] - '0';
+    if ('a' <= tolower(str[i]) && tolower(str[i]) <= 'f') {
+      digit = 10 + tolower(str[i]) - 'a';
+    }
+    ans = ans * 16 + digit;
   }
   return ans;
 }
@@ -64,21 +73,10 @@ void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size) {
 
   if (exact_match) {
     dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
-    if (shard_dll->num_nodes == 0) {
-      shard_dll->head = shard;
-    } else {
-      shard_dll->tail->next = shard;
-    }
-    shard_dll->tail = shard;
-    shard_dll->num_nodes++;
+    dll_insert_last(shard_dll, shard);
   }
   else {
-    // printf("Non exact match, will insert on index %d\n", shard_dll_idx);
-    dll_t *shard_dll = malloc(sizeof(dll_t));
-    shard_dll->head = shard;
-    shard_dll->tail = shard;
-    shard_dll->block_size = shard_size;
-    shard_dll->num_nodes = 1;
+    dll_t *shard_dll = dll_create_from_node(shard_size, shard);
     // printf("Before on %d dlls\n", list->dlls->num_elements);
     al_insert(list->dlls, shard_dll_idx, shard_dll);
     free(shard_dll);
@@ -137,37 +135,22 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
     int num_blocks = bytes_per_list / block_size;
     // printf("Will alloc list of %lu blocks with %lu size each\n", num_blocks, block_size);
 
-    dll_t *tmp = malloc(sizeof(dll_t));
-    tmp->block_size = block_size;
     // printf("block size = %lu\n", block_size);
-    tmp->head = NULL;
-    tmp->tail = NULL;
-    tmp->num_nodes = num_blocks;
+    dll_t *tmp = dll_create_empty(block_size);
     al_insert(list->dlls, i, tmp);
     free(tmp);
     // printf("set to %lu\n", ((dll_t *)al_get(list->dlls, i))->block_size);
 
-    ((dll_t *)al_get(list->dlls, i))->head = NULL;
-    dll_node_t *prev = NULL;
+    dll_t *dll = ((dll_t *)al_get(list->dlls, i));
     for (int j = 0; j < num_blocks; ++j) {
       // printf("[d] Alloc block %d on addr %lu\n", i, addr);
       dll_node_t *new = malloc(sizeof(dll_node_t));
     
-      new->next = NULL;
-      new->prev = prev;
       new->start_addr = addr;
       addr += block_size;
 
-      if (prev) {
-        prev->next = new;
-      }
-      else {
-        ((dll_t *)al_get(list->dlls, i))->head = new;
-      }
-
-      prev = new;
+      dll_insert_last(dll, new);
     }
-    ((dll_t *)al_get(list->dlls, i))->tail = prev;
   }
 
   printf("Finished alloc, num lists: %d\n", list->dlls->num_elements);
@@ -197,19 +180,23 @@ void handle_print(sfl_t *list) {
   for (int i = 0; i < list->dlls->num_elements; ++i) {
     dll_t *dll = ((dll_t *)al_get(list->dlls, i));
 
+    printf("Now printing list with %lu size (%d nodes)\n", dll->block_size, dll->num_nodes);
+
     if (dll->num_nodes > 0) {
       printf("Blocks with %lu bytes: %d free block(s) - ", dll->block_size, dll->num_nodes);
 
-      for (dll_node_t *node = dll->head; node; node = node->next) {
-        printf("0x%lx ", node->start_addr);
-      }
+      dll_node_t *node = dll->head;
+      do {
+        printf("%lu ", node->start_addr);
+        node = node->next;
+      } while (node != dll->head);
       printf("\n");
     }
   }
   printf("Allocated blocks: ");
   for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
     block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
-    printf("(0x%lx - %lu) ", b->start_addr, b->block_size);
+    printf("(%lu - %lu) ", b->start_addr, b->block_size);
   }
   printf("\n");
 
@@ -263,10 +250,10 @@ void handle_malloc(char *cmd, sfl_t *list) {
     }
 
     // alloc head of dll
-    dll_node_t *mallocd_node = dll->head;
+    dll_node_t *mallocd_node = dll_pop_first(dll);
     
-    dll->head = dll->head->next;
-    dll->num_nodes--;
+    // dll->head = dll->head->next;
+    // dll->num_nodes--;
 
     printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
     printf("Will break block of size %lu into %lu and %lu\n", dll->block_size, requested, dll->block_size - requested);
@@ -283,7 +270,6 @@ void handle_malloc(char *cmd, sfl_t *list) {
     int block_idx = al_first_if(list->allocd_blocks, &(new_block->start_addr), block_address_greater);
     al_insert(list->allocd_blocks, block_idx, new_block);
     free(new_block);
-
 
     size_t shard_addr = mallocd_node->start_addr + requested;
     size_t shard_size = dll->block_size - requested;

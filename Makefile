@@ -1,4 +1,4 @@
-FILES = main.c arraylist.c
+FILES = main.c arraylist.c dll.c
 
 build: $(FILES)
 	gcc -Wall -Wextra -pedantic -o sfl $(FILES)
