@@ -222,7 +222,7 @@ void handle_print(sfl_t *list) {
 
 void handle_malloc(char *cmd, sfl_t *list) {
   if (!list) {
-    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    printf("Heap was not initialised. You are a massive idiot :)\n");
     return;
   }
 
@@ -250,7 +250,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
   }
 
   if (!requested) {
-    fprintf(stderr, "Cannot alloc 0 bytes\n");
+    printf("Cannot alloc 0 bytes\n");
     return;
   }
 
@@ -315,12 +315,12 @@ void handle_malloc(char *cmd, sfl_t *list) {
     return;
   }
 
-  fprintf(stderr, "Out of memory.\n");
+  printf("Out of memory.\n");
 }
 
 void handle_read(char *cmd, sfl_t *list) {
   if (!list) {
-    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    printf("Heap was not initialised. You are a massive idiot :)\n");
     return;
   }
 
@@ -361,7 +361,7 @@ void handle_read(char *cmd, sfl_t *list) {
   int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
 
   if (!exact_match) {
-    fprintf(stderr, "Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
+    printf("Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
     return;
   }
 
@@ -411,6 +411,10 @@ void handle_destroy(sfl_t **ptr_list) {
   for (int i = 0; i < list->dlls->num_elements; ++i) {
     dll_t *dll = ((dll_t *)al_get(list->dlls, i));
     dll_node_t *head = dll->head;
+
+    if (!head) {
+      continue;
+    }
     
     dll_node_t *node = head;
     do {
@@ -436,7 +440,7 @@ void handle_destroy(sfl_t **ptr_list) {
 
 void handle_free(char *cmd, sfl_t *list) {
   if (!list) {
-    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    printf("Heap was not initialised. You are a massive idiot :)\n");
     return;
   }
 
@@ -470,14 +474,14 @@ void handle_free(char *cmd, sfl_t *list) {
   int block_idx = al_first_if(list->allocd_blocks, &addr, block_address_greater) - 1;
 
   if (block_idx < 0) {
-    fprintf(stderr, "Invalid free.\n");
+    printf("Invalid free\n");
     return;
   }
 
   block_t *block = al_get(list->allocd_blocks, block_idx);
 
   if (block->start_addr != addr) {
-    fprintf(stderr, "Invalid free.\n");
+    printf("Invalid free\n");
     return;
   }
 
@@ -499,7 +503,7 @@ void handle_free(char *cmd, sfl_t *list) {
 
 void handle_write(char *cmd, sfl_t *list) {
   if (!list) {
-    fprintf(stderr, "Heap was not initialised. You are a massive idiot :)\n");
+    printf("Heap was not initialised. You are a massive idiot :)\n");
     return;
   }
 
@@ -546,7 +550,7 @@ void handle_write(char *cmd, sfl_t *list) {
   int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
 
   if (!exact_match) {
-    fprintf(stderr, "Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
+    printf("Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
     return;
   }
 
@@ -567,7 +571,7 @@ void handle_write(char *cmd, sfl_t *list) {
     }
   }
   if (contiguous_until < addr + num_bytes) {
-    fprintf(stderr, "Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+    printf("Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
     return;
   }
 
