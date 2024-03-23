@@ -316,7 +316,8 @@ void handle_malloc(char *cmd, sfl_t *list) {
   printf("Out of memory\n");
 }
 
-void handle_read(char *cmd, sfl_t *list) {
+void handle_read(char *cmd, sfl_t **ptr_list) {
+  sfl_t *list = *ptr_list;
   if (!list) {
     printf("Heap was not initialised. You are a massive idiot :)\n");
     return;
@@ -359,7 +360,13 @@ void handle_read(char *cmd, sfl_t *list) {
   int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
 
   if (!exact_match) {
+  #ifdef DEBUG_MODE
     printf("Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
+  #else
+    printf("Segmentation fault (core dumped)\n");
+  #endif 
+    handle_print(list);
+    handle_destroy(ptr_list);
     return;
   }
 
@@ -386,6 +393,7 @@ void handle_read(char *cmd, sfl_t *list) {
     printf("Segmentation fault (core dumped)\n");
   #endif 
     handle_print(list);
+    handle_destroy(ptr_list);
     return;
   }
 
@@ -502,7 +510,8 @@ void handle_free(char *cmd, sfl_t *list) {
   list->total_allocd -= new_size;
 }
 
-void handle_write(char *cmd, sfl_t *list) {
+void handle_write(char *cmd, sfl_t **ptr_list) {
+  sfl_t *list = *ptr_list;
   if (!list) {
     printf("Heap was not initialised. You are a massive idiot :)\n");
     return;
@@ -588,6 +597,7 @@ void handle_write(char *cmd, sfl_t *list) {
     printf("Segmentation fault (core dumped)\n");
   #endif 
     handle_print(list);
+    handle_destroy(ptr_list);
     return;
   }
 
@@ -616,6 +626,7 @@ void handle_write(char *cmd, sfl_t *list) {
     printf("Segmentation fault (core dumped)\n");
   #endif 
     handle_print(list);
+    handle_destroy(ptr_list);
     return;
   }
 
@@ -667,10 +678,18 @@ int main() {
       handle_malloc(cmd, list);
     }
     else if (starts_with(cmd, "READ")) {
-      handle_read(cmd, list);
+      handle_read(cmd, &list);
+
+      if (!list) {
+        return 0;
+      }
     }
     else if (starts_with(cmd, "WRITE")) {
-      handle_write(cmd, list);
+      handle_write(cmd, &list);
+
+      if (!list) {
+        return 0;
+      }
     }
     else if (starts_with(cmd, "FREE")) {
       handle_free(cmd, list);
