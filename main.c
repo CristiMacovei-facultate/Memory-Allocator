@@ -13,10 +13,8 @@
 #define CMD_LINE 600
 
 char *strdup(char *str) {
-  size_t n = strlen(str);
-
-  char *ans = malloc(n);
-  memcpy(ans, str, n);
+  char *ans = malloc(strlen(str) + 1);
+  strcpy(ans, str);
 
   return ans;
 }
@@ -315,7 +313,7 @@ void handle_malloc(char *cmd, sfl_t *list) {
     return;
   }
 
-  printf("Out of memory.\n");
+  printf("Out of memory\n");
 }
 
 void handle_read(char *cmd, sfl_t *list) {
@@ -384,7 +382,10 @@ void handle_read(char *cmd, sfl_t *list) {
   if (contiguous_until < addr + num_bytes) {
   #ifdef DEBUG_MODE
     printf("Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+  #else
+    printf("Segmentation fault (core dumped)\n");
   #endif 
+    handle_print(list);
     return;
   }
 
@@ -507,38 +508,68 @@ void handle_write(char *cmd, sfl_t *list) {
     return;
   }
 
-  char sep[] = " ";
-  char *p = strtok(cmd, sep);
+  // char sep[] = " ";
+  // char *p = strtok(cmd, sep);
 
   size_t addr = 0;
-  char *data;
+  char *data = NULL;
   size_t num_bytes = 0;
 
-  int arg_index = 0; 
-  while (arg_index < 4 && p) {
-  #ifdef DEBUG_MODE
-    printf("[DEBUG] Write - arg [%d]: '%s'\n", arg_index, p);
-  #endif 
-    
-    // start address 
-    if (arg_index == 1) {
-      size_t tmp_addr = atox(p + 2);
-      if (tmp_addr) {
-        addr = tmp_addr;
-      }
-    }
-    else if (arg_index == 2) {
-      data = strdup(p);
-    }
-    else if (arg_index == 3) {
-      size_t tmp_num_bytes = atoll(p);
-      if (tmp_num_bytes) {
-        num_bytes = tmp_num_bytes;
-      }
+  strcat(cmd, " ");
+  size_t n = strlen(cmd);
+
+  int arg_index = 0;
+  size_t prev_space = -1;
+  int num_quotes = 0;
+  for (size_t i = 0; i < n; ++i) {
+    if (cmd[i] == '"') {
+      num_quotes = 1 - num_quotes;
     }
 
-    ++arg_index;
-    p = strtok(NULL, sep);
+    if (cmd[i] == ' ' && num_quotes == 0) {
+      if (prev_space != (i - 1)) {
+        cmd[i] = '\0';
+
+        char *arg = (cmd + prev_space + 1);
+
+        // start address 
+        if (arg_index == 1) {
+          size_t tmp_addr = atox(arg + 2);
+          if (tmp_addr) {
+            addr = tmp_addr;
+          }
+        }
+        else if (arg_index == 2) {
+          if (arg[0] == '"') {
+            arg[strlen(arg) - 1] = '\0';
+            data = strdup(arg + 1);
+            arg[strlen(arg)] = ' ';
+          }
+          else {
+            data = strdup(arg);
+          }
+        }
+        else if (arg_index == 3) {
+          size_t tmp_num_bytes = atoll(arg);
+          if (tmp_num_bytes) {
+            num_bytes = tmp_num_bytes;
+          }
+        }
+
+        cmd[i] = ' ';
+        ++arg_index;
+      }
+
+      prev_space = i;
+    }
+  }
+
+  if (data == NULL) {
+    return;
+  }
+
+  if (num_bytes > strlen(data)) {
+    num_bytes = strlen(data);
   }
 
 #ifdef DEBUG_MODE
@@ -550,7 +581,13 @@ void handle_write(char *cmd, sfl_t *list) {
   int exact_match = target_block->start_addr <= addr && target_block->start_addr + target_block->block_size > addr;
 
   if (!exact_match) {
+    free(data);
+  #ifdef DEBUG_MODE
     printf("Segmentation Fault (not alloc'd). Esti prost facut gramada\n");
+  #else
+    printf("Segmentation fault (core dumped)\n");
+  #endif 
+    handle_print(list);
     return;
   }
 
@@ -571,7 +608,14 @@ void handle_write(char *cmd, sfl_t *list) {
     }
   }
   if (contiguous_until < addr + num_bytes) {
+    free(data);
+
+  #ifdef DEBUG_MODE
     printf("Segmentation Fault (not all bytes alloc'd - contig. until %lu, needed %lu). Esti prost facut gramada\n", contiguous_until, addr + num_bytes);
+  #else
+    printf("Segmentation fault (core dumped)\n");
+  #endif 
+    handle_print(list);
     return;
   }
 
@@ -592,6 +636,8 @@ void handle_write(char *cmd, sfl_t *list) {
     printf("[DEBUG] Wrote char %c on index %d\n", data[i], index);
   #endif 
   }
+
+  free(data);
 }
 
 int main() {
