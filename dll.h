@@ -8,18 +8,18 @@ implementation of a circular doubly linked list
 #include <stdlib.h>
 
 typedef struct dll_node {
-  struct dll_node *next;
-  struct dll_node *prev;
-  
-  size_t start_addr;
-  int fragment_index;
+	struct dll_node *next;
+	struct dll_node *prev;
+	
+	size_t start_addr;
+	int fragment_index;
 } dll_node_t;
 
 typedef struct doubly_linked_list {
-  dll_node_t *head;
+	dll_node_t *head;
 
-  int num_nodes;
-  size_t block_size;
+	int num_nodes;
+	size_t block_size;
 } dll_t;
 
 dll_t *dll_create_empty(size_t block_size); 

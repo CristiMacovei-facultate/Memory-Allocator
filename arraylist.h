@@ -5,10 +5,10 @@
 #include <stdint.h>
 
 typedef struct arraylist {
-  int num_elements;
-  size_t capacity;
-  size_t element_size;
-  void *data;
+	int num_elements;
+	size_t capacity;
+	size_t element_size;
+	void *data;
 } arraylist_t;
 
 arraylist_t *al_create(int capacity, size_t size);
