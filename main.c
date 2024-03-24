@@ -59,9 +59,10 @@ int block_address_greater(const void *addr, const void* block) {
   return ((block_t*)block)->start_addr > (*(size_t*)addr);
 }
 
-void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size) {
+void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size, int fragment_index) {
   dll_node_t *shard = malloc(sizeof(dll_node_t));
   shard->start_addr = shard_addr;
+  shard->fragment_index = fragment_index;
   shard->next = NULL;
   shard->prev = NULL;
 
@@ -69,7 +70,7 @@ void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size) {
   int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
 
 #ifdef DEBUG_MODE
-  printf("Shard of size %lu will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
+  printf("Shard of size %lu (fi = %d) will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, fragment_index, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
 #endif
 
   if (exact_match) {
@@ -89,6 +90,64 @@ void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size) {
   }
 }
 
+
+void repair_fragmentation(sfl_t *list, int fragment_index, size_t block_addr, size_t block_size) { 
+  if (fragment_index == 0) {
+  #ifdef DEBUG_MODE
+    printf("[DEBUG] Fixed everything until root fragmentation, adding new shard and exiting repair\n");
+  #endif
+    insert_new_shard(list, block_addr, block_size, fragment_index);
+    return;
+  }
+  
+  fragm_data_t *fd = al_get(list->fragmentations, fragment_index);
+
+#ifdef DEBUG_MODE
+  printf("[DEBUG] Repairing fragment %d\n", fragment_index);
+#endif
+
+  size_t free_shard_idx = fd->shards[0].addr != block_addr ? 0 : 1;
+  size_t free_shard_size = fd->shards[free_shard_idx].size;
+  size_t free_shard_addr = fd->shards[free_shard_idx].addr;
+#ifdef DEBUG_MODE
+  printf("Free shard is in list of size %lu\n", free_shard_size);
+#endif
+
+  int shard_dll_idx = al_first_if(list->dlls, &free_shard_size, dll_greater_equal);
+  dll_t *free_shard_dll = (dll_t*)al_get(list->dlls, shard_dll_idx);
+
+  if (free_shard_dll->num_nodes == 0) {
+  #ifdef DEBUG_MODE
+    printf("Shard dll not found, adding new shard and exiting repair\n");
+  #endif
+    insert_new_shard(list, block_addr, block_size, fragment_index);
+    return;
+  }
+
+#ifdef DEBUG_MODE
+  printf("Found shard dll #%d, looking up addr 0x%lx\n", shard_dll_idx, free_shard_addr);
+#endif
+
+  dll_node_t *shard = dll_find_first_if(free_shard_dll, free_shard_addr);
+  if (shard == NULL || shard->start_addr != free_shard_addr) {
+  #ifdef DEBUG_MODE    
+    printf("Shard not found, adding new shard and exiting repair\n");
+  #endif
+    insert_new_shard(list, block_addr, block_size, fragment_index);
+    return;
+  }
+
+#ifdef DEBUG_MODE
+  printf("Found shard, blowing it up from list\n");
+#endif
+  dll_erase_node(free_shard_dll, shard);
+  free(shard);
+  
+  // attempt to recursively fix parent fragmentation
+  repair_fragmentation(list, fd->parent_fragm, fd->shards[0].addr, block_size + free_shard_size);
+}
+
+
 void handle_init(char *cmd, sfl_t **ptr_list) {
   char sep[] = " ";
   char *p = strtok(cmd, sep);
@@ -96,9 +155,10 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
   size_t start_addr = 0;
   int num_lists = 8;
   size_t bytes_per_list = 1024;
+  int rec_type = 0;
 
   int i = 0; 
-  while (i < 4 && p) {
+  while (i < 5 && p) {
     // start address 
     if (i == 1) {
       size_t tmp_start_addr = atox(p + 2); 
@@ -120,6 +180,13 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
         bytes_per_list = tmp_bpl;
       }
     }
+    // type of reconstruction
+    else if (i == 4) {
+      size_t tmp_type = atol(p);
+      if (tmp_type) {
+        rec_type = tmp_type;
+      }
+    }
 
     ++i;
     p = strtok(NULL, sep);
@@ -127,10 +194,18 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 
   sfl_t *list = malloc(sizeof(sfl_t));
   list->start_addr = start_addr;
-  list->type = 0; //todo change this in the future
+  list->type = rec_type;
   
   list->dlls = al_create(num_lists, sizeof(dll_t));
   list->allocd_blocks = al_create(1, sizeof(block_t));
+  if (list->type) {
+    list->fragmentations = al_create(2, sizeof(fragm_data_t));
+
+    fragm_data_t *fd_zero = malloc(sizeof(fragm_data_t));
+    fd_zero->parent_fragm = 0;
+    al_insert(list->fragmentations, 0, fd_zero);
+    free(fd_zero);
+  }
 
   list->total_mem = bytes_per_list * num_lists;
 
@@ -162,6 +237,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
       dll_node_t *new = malloc(sizeof(dll_node_t));
     
       new->start_addr = addr;
+      new->fragment_index = 0; // not a fragment of anything yet 
       addr += block_size;
 
       dll_insert_last(dll, new);
@@ -174,6 +250,47 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 
   *ptr_list = list;
 }
+
+void handle_destroy(sfl_t **ptr_list) {  
+  sfl_t *list = *ptr_list;
+
+  // free all elements of dll
+  for (int i = 0; i < list->dlls->num_elements; ++i) {
+    dll_t *dll = ((dll_t *)al_get(list->dlls, i));
+    dll_node_t *head = dll->head;
+
+    if (dll->num_nodes == 0) {
+      continue;
+    }
+    
+    dll_node_t *node = head;
+    do {
+      dll_node_t *tmp = node;
+      // printf("Trying to free node addr = 0x%lx\n", node->start_addr);
+      node = node->next;
+
+      free(tmp);
+    } while (node != head);
+  }
+
+  // free data contained in allocd blocks
+  for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
+    block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
+    free(b->data);
+  }
+
+  al_free(list->dlls);
+  al_free(list->allocd_blocks);
+
+  if (list->type == 1) {
+    al_free(list->fragmentations);
+  }
+  
+  free(list);
+
+  *ptr_list = NULL;
+}
+
 
 void handle_print(sfl_t *list) {
   printf("+++++DUMP+++++\n");
@@ -202,7 +319,11 @@ void handle_print(sfl_t *list) {
 
       dll_node_t *node = dll->head;
       do {
+      #ifdef DEBUG_MODE
+        printf(" 0x%lx (fi = %d)", node->start_addr, node->fragment_index);
+      #else
         printf(" 0x%lx", node->start_addr);
+      #endif 
         node = node->next;
       } while (node != dll->head);
       printf("\n");
@@ -211,7 +332,11 @@ void handle_print(sfl_t *list) {
   printf("Allocated blocks :");
   for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
     block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
+  #ifdef DEBUG_MODE
+    printf(" (0x%lx - %lu, fi = %d)", b->start_addr, b->block_size, b->fragment_index);
+  #else
     printf(" (0x%lx - %lu)", b->start_addr, b->block_size);
+  #endif
   }
   printf("\n");
 
@@ -288,27 +413,42 @@ void handle_malloc(char *cmd, sfl_t *list) {
     new_block->block_size = requested;
     new_block->start_addr = mallocd_node->start_addr;
     new_block->data = calloc(requested, sizeof(uint8_t));
+    new_block->fragment_index = mallocd_node->fragment_index; // initially 
+    
     (list->num_allocs)++;
     (list->total_allocd) += requested;
-
-    int block_idx = al_first_if(list->allocd_blocks, &(new_block->start_addr), block_address_greater);
-    al_insert(list->allocd_blocks, block_idx, new_block);
-    free(new_block);
-
     size_t shard_addr = mallocd_node->start_addr + requested;
     size_t shard_size = dll->block_size - requested;
     
-    free(mallocd_node);
-
     if (shard_size > 0) {
       list->num_fragmentations++;
-      insert_new_shard(list, shard_addr, shard_size);
+      
+      if (list->type == 1) {
+        fragm_data_t *fd = malloc(sizeof(fragm_data_t));
+        fd->shards[0].size = new_block->block_size;
+        fd->shards[0].addr = new_block->start_addr;
+        fd->shards[1].size = shard_size;
+        fd->shards[1].addr = shard_addr;
+        fd->parent_fragm = mallocd_node->fragment_index;
+
+        al_insert(list->fragmentations, list->num_fragmentations, fd);
+        free(fd);
+      }
+
+      new_block->fragment_index = list->num_fragmentations;
+      insert_new_shard(list, shard_addr, shard_size, list->num_fragmentations);
     }
   #ifdef DEBUG_MODE
     else {
       printf("[DEBUG] Shard size zero, skipping.\n");
     }
   #endif
+
+    int block_idx = al_first_if(list->allocd_blocks, &(new_block->start_addr), block_address_greater);
+    al_insert(list->allocd_blocks, block_idx, new_block);
+
+    free(mallocd_node);
+    free(new_block);
 
     return;
   }
@@ -413,40 +553,6 @@ void handle_read(char *cmd, sfl_t **ptr_list) {
   printf("\n");
 }
 
-void handle_destroy(sfl_t **ptr_list) {  
-  sfl_t *list = *ptr_list;
-
-  // free all elements of dll
-  for (int i = 0; i < list->dlls->num_elements; ++i) {
-    dll_t *dll = ((dll_t *)al_get(list->dlls, i));
-    dll_node_t *head = dll->head;
-
-    if (!head) {
-      continue;
-    }
-    
-    dll_node_t *node = head;
-    do {
-      dll_node_t *tmp = node;
-      node = node->next;
-
-      free(tmp);
-    } while (node != head);
-  }
-
-  // free data contained in allocd blocks
-  for (int i = 0; i < list->allocd_blocks->num_elements; ++i) {
-    block_t *b = ((block_t*)al_get(list->allocd_blocks, i));
-    free(b->data);
-  }
-
-  al_free(list->dlls);
-  al_free(list->allocd_blocks);
-  free(list);
-
-  *ptr_list = NULL;
-}
-
 void handle_free(char *cmd, sfl_t *list) {
   if (!list) {
     printf("Heap was not initialised. You are a massive idiot :)\n");
@@ -500,11 +606,21 @@ void handle_free(char *cmd, sfl_t *list) {
 
   size_t new_addr = block->start_addr;
   size_t new_size = block->block_size;
+  int fragm_idx = block->fragment_index;
+
+#ifdef DEBUG_MODE
+  printf("Frag index = %d\n", fragm_idx);
+#endif 
 
   free(block->data);
   al_erase(list->allocd_blocks, block_idx);
 
-  insert_new_shard(list, new_addr, new_size);
+  if (list->type) {
+    repair_fragmentation(list, fragm_idx, new_addr, new_size);
+  }
+  else {
+    insert_new_shard(list, new_addr, new_size, fragm_idx);
+  }
 
   ++(list->num_frees);
   list->total_allocd -= new_size;

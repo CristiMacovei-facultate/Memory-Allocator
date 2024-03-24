@@ -31,6 +31,26 @@ dll_t *dll_create_from_node (size_t block_size, dll_node_t *new_node) {
   return new_dll;
 }
 
+dll_node_t *dll_find_first_if(dll_t *list, size_t target_addr) {
+  if (list->num_nodes == 0) {
+    return NULL;
+  }
+  
+  dll_node_t *node = list->head;
+  do {
+  #ifdef DEBUG_MODE
+    printf("Trying node addr = 0x%lx\n", node->start_addr);
+  #endif
+    if (node->start_addr == target_addr) {
+      return node;
+    }
+
+    node = node->next;
+  } while (node != list->head);
+
+  return NULL;
+}
+
 void dll_insert_first(dll_t *list, dll_node_t *new_node) {
   int num_nodes = list->num_nodes;
   ++(list->num_nodes);
@@ -118,4 +138,25 @@ dll_node_t *dll_pop_first(dll_t *list) {
   list->head = list->num_nodes > 0 ? old_head->next : NULL;
 
   return old_head;
+}
+
+void dll_erase_node(dll_t *list, dll_node_t *node) {
+  if (list->num_nodes == 0) {
+  #ifdef DEBUG_MODE
+    printf("[DEBUG - WARN] Warning: Trying to erase from empty list\n");
+  #endif
+    return;
+  }
+
+  --(list->num_nodes);
+
+  dll_node_t *tmp_next = node->next;
+  dll_node_t *tmp_prev = node->prev;
+
+  tmp_next->prev = tmp_prev;
+  tmp_prev->next = tmp_next;
+
+  if (list->head == node && list->num_nodes > 0) {
+    list->head = list->head->next;
+  }
 }

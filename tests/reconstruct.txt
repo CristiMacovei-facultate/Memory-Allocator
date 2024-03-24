@@ -1,0 +1,18 @@
+init_heap 0x1 1 8 1
+malloc 1
+malloc 1
+malloc 1
+malloc 1
+malloc 1
+malloc 1
+malloc 1
+malloc 1
+free 0x1
+free 0x2
+free 0x3
+free 0x4
+free 0x5
+free 0x6
+free 0x7
+dump_memory
+free 0x8
