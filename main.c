@@ -6,63 +6,31 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#include "utils.h"
 #include "dll.h"
 #include "arraylist.h"
 #include "structs.h"
 
 #define CMD_LINE 600
 
-char *strdup(char *str)
+int dll_greater_equal(const void *target_size, const void *a)
 {
-	char *ans = malloc(strlen(str) + 1);
-	strcpy(ans, str);
-
-	return ans;
+	return ((dll_t *)a)->block_size >= (*(size_t *)target_size);
 }
 
-size_t atox(char *str)
+int block_address_less_equal(const void *addr, const void *block)
 {
-#ifdef DEBUG_MODE
-	printf("Passing %s into this shitty function\n", str);
-#endif 
-
-	size_t ans = 0;
-	size_t n = strlen(str);
-	for (size_t i = 0; i < n; ++i)
-	{
-		int digit = str[i] - '0';
-		if ('a' <= tolower(str[i]) && tolower(str[i]) <= 'f')
-			digit = 10 + tolower(str[i]) - 'a';
-		ans = ans * 16 + digit;
-	}
-	return ans;
+	return (*(size_t *)addr) >= ((block_t *)block)->start_addr;
 }
 
-int starts_with(char *cmd, char *string)
+int block_address_greater(const void *addr, const void *block)
 {
-	int n = strlen(string);
-	for (int i = 0; i < n; ++i)
-	{
-		if (tolower(cmd[i]) != tolower(string[i]))
-			return 0;
-	}
-
-	return 1;
+	return ((block_t *)block)->start_addr > (*(size_t *)addr);
 }
 
-int dll_greater_equal(const void* target_size, const void *a) {
-	return ((dll_t*)a)->block_size >= (*(size_t*)target_size);
-}
-
-int block_address_less_equal(const void *addr, const void* block) {
-	return (*(size_t*)addr) >= ((block_t*)block)->start_addr;
-}
-
-int block_address_greater(const void *addr, const void* block) {
-	return ((block_t*)block)->start_addr > (*(size_t*)addr);
-}
-
-void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size, int fragment_index) {
+void insert_new_shard(sfl_t *list, size_t shard_addr,
+					  size_t shard_size, int fragment_index)
+{
 	dll_node_t *shard = malloc(sizeof(dll_node_t));
 	shard->start_addr = shard_addr;
 	shard->fragment_index = fragment_index;
@@ -70,19 +38,18 @@ void insert_new_shard(sfl_t *list, size_t shard_addr, size_t shard_size, int fra
 	shard->prev = NULL;
 
 	int shard_dll_idx = al_first_if(list->dlls, &shard_size, dll_greater_equal);
-	int exact_match = ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size == shard_size;
+	dll_t *shard_dll = (dll_t *)al_get(list->dlls, shard_dll_idx);
+	int exact_match = shard_dll->block_size == shard_size;
 
 #ifdef DEBUG_MODE
 	printf("Shard of size %lu (fi = %d) will be inserted in list %d (size = %lu, exact = %d)\n", shard_size, fragment_index, shard_dll_idx, ((dll_t*)al_get(list->dlls, shard_dll_idx))->block_size , exact_match);
 #endif
 
 	if (exact_match) {
-		dll_t *shard_dll = al_get(list->dlls, shard_dll_idx);
-		// dll_insert_last(shard_dll, shard);
 		dll_insert_before_first_if(shard_dll, shard); // todo make this ADT
 	}
 	else {
-		dll_t *shard_dll = dll_create_from_node(shard_size, shard);
+		shard_dll = dll_create_from_node(shard_size, shard);
 		// printf("Before on %d dlls\n", list->dlls->num_elements);
 		al_insert(list->dlls, shard_dll_idx, shard_dll);
 		free(shard_dll);
@@ -164,7 +131,7 @@ void handle_init(char *cmd, sfl_t **ptr_list) {
 	while (i < 5 && p) {
 		// start address 
 		if (i == 1) {
-			size_t tmp_start_addr = atox(p + 2); 
+			size_t tmp_start_addr = atolx(p + 2); 
 			if (tmp_start_addr) {
 				start_addr = tmp_start_addr;
 			}
@@ -478,7 +445,7 @@ void handle_read(char *cmd, sfl_t **ptr_list) {
 		
 		// start address 
 		if (arg_index == 1) {
-			size_t tmp_addr = atox(p + 2);
+			size_t tmp_addr = atolx(p + 2);
 			if (tmp_addr) {
 				addr = tmp_addr;
 			}
@@ -575,7 +542,7 @@ void handle_free(char *cmd, sfl_t *list) {
 
 		// start address 
 		if (arg_index == 1) {
-			size_t tmp_addr = atox(p + 2);
+			size_t tmp_addr = atolx(p + 2);
 			if (tmp_addr) {
 				addr = tmp_addr;
 			}
@@ -662,7 +629,7 @@ void handle_write(char *cmd, sfl_t **ptr_list) {
 
 				// start address 
 				if (arg_index == 1) {
-					size_t tmp_addr = atox(arg + 2);
+					size_t tmp_addr = atolx(arg + 2);
 					if (tmp_addr) {
 						addr = tmp_addr;
 					}

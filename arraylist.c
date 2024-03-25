@@ -43,7 +43,8 @@ void al_insert(arraylist_t *list, int index, void *src)
 	memcpy(ptr, src, list->element_size);
 
 #ifdef DEBUG_MODE
-	printf("[DEBUG] Now on %d dlls out of %lu\n", list->num_elements, list->capacity);
+	printf("[DEBUG] Now on %d dlls out of %lu\n",
+		   list->num_elements, list->capacity);
 #endif
 }
 
@@ -60,7 +61,8 @@ void al_free(arraylist_t *list)
 
 // linear search, maybe could be changed to binary search
 // if arraylist is kept in order
-int al_first_if(arraylist_t *list, void *target, int cmp(const void*, const void*))
+int al_first_if(arraylist_t *list, void *target,
+				int cmp(const void*, const void*))
 {
 	for (int i = 0; i < list->num_elements; ++i) {
 		void *curr = al_get(list, i);
@@ -71,7 +73,8 @@ int al_first_if(arraylist_t *list, void *target, int cmp(const void*, const void
 	return list->num_elements;
 }
 
-int al_last_if(arraylist_t *list, void *target, int cmp(const void*, const void*))
+int al_last_if(arraylist_t *list, void *target,
+			   int cmp(const void*, const void*))
 {
 	int ans = 0;
 	for (int i = 0; i < list->num_elements; ++i) {
@@ -91,8 +94,7 @@ void al_erase(arraylist_t *list, int index)
 		return;
 
 	list->num_elements--;
-	if (index < list->num_elements)
-	{
+	if (index < list->num_elements) {
 		for (int i = index; i < list->num_elements; ++i) {
 			void *first = al_get(list, i);
 			void *next = al_get(list, i + 1);
@@ -101,7 +103,7 @@ void al_erase(arraylist_t *list, int index)
 		}
 	}
 
-	if (list->num_elements > 0 && 
-	   (size_t)list->num_elements * 2 < list->capacity)
+	if (list->num_elements > 0 &&
+		(size_t)list->num_elements * 2 < list->capacity)
 		al_resize(list, list->capacity / 2);
 }
