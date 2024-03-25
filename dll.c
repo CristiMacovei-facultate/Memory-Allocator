@@ -6,11 +6,12 @@ implementation of a circular doubly linked list
 
 #ifdef DEBUG_MODE
 #include <stdio.h>
-#endif 
+#endif
 
 #include "dll.h"
 
-dll_t *dll_create_empty(size_t block_size) {
+dll_t *dll_create_empty(size_t block_size)
+{
 	dll_t *new_dll = (dll_t *)malloc(sizeof(dll_t));
 	new_dll->block_size = block_size;
 	new_dll->num_nodes = 0;
@@ -20,9 +21,10 @@ dll_t *dll_create_empty(size_t block_size) {
 	return new_dll;
 }
 
-dll_t *dll_create_from_node (size_t block_size, dll_node_t *new_node) {
+dll_t *dll_create_from_node(size_t block_size, dll_node_t *new_node)
+{
 	dll_t *new_dll = dll_create_empty(block_size);
-	
+
 	new_dll->num_nodes = 1;
 	new_node->next = new_node;
 	new_node->prev = new_node;
@@ -31,19 +33,18 @@ dll_t *dll_create_from_node (size_t block_size, dll_node_t *new_node) {
 	return new_dll;
 }
 
-dll_node_t *dll_find_first_if(dll_t *list, size_t target_addr) {
-	if (list->num_nodes == 0) {
+dll_node_t *dll_find_first_if(dll_t *list, size_t target_addr)
+{
+	if (list->num_nodes == 0)
 		return NULL;
-	}
-	
+
 	dll_node_t *node = list->head;
 	do {
 	#ifdef DEBUG_MODE
 		printf("Trying node addr = 0x%lx\n", node->start_addr);
 	#endif
-		if (node->start_addr == target_addr) {
+		if (node->start_addr == target_addr)
 			return node;
-		}
 
 		node = node->next;
 	} while (node != list->head);
@@ -51,12 +52,15 @@ dll_node_t *dll_find_first_if(dll_t *list, size_t target_addr) {
 	return NULL;
 }
 
-void dll_insert_first(dll_t *list, dll_node_t *new_node) {
+void dll_insert_first(dll_t *list, dll_node_t *new_node)
+{
 	int num_nodes = list->num_nodes;
 	++(list->num_nodes);
 
 	if (num_nodes == 0) {
-		new_node->next = new_node->prev = list->head = new_node;
+		new_node->next = new_node;
+		new_node->prev = new_node;
+		list->head = new_node;
 		return;
 	}
 
@@ -69,12 +73,15 @@ void dll_insert_first(dll_t *list, dll_node_t *new_node) {
 	list->head = new_node;
 }
 
-void dll_insert_last(dll_t *list, dll_node_t *new_node) {
+void dll_insert_last(dll_t *list, dll_node_t *new_node)
+{
 	int num_nodes = list->num_nodes;
 	++(list->num_nodes);
 
 	if (num_nodes == 0) {
-		new_node->next = new_node->prev = list->head = new_node;
+		new_node->next = new_node;
+		new_node->prev = new_node;
+		list->head = new_node;
 		return;
 	}
 
@@ -86,21 +93,23 @@ void dll_insert_last(dll_t *list, dll_node_t *new_node) {
 	tail->next = new_node;
 }
 
-void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node) {
+void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node)
+{
 	int num_nodes = list->num_nodes;
 	++(list->num_nodes);
 
 	if (num_nodes == 0) {
-		new_node->next = new_node->prev = list->head = new_node;
+		new_node->next = new_node;
+		new_node->prev = new_node;
+		list->head = new_node;
 		return;
 	}
 
 	dll_node_t *head = list->head;
 	dll_node_t *node = head;
 	do {
-		if (node->start_addr > new_node->start_addr) {
+		if (node->start_addr > new_node->start_addr)
 			break;
-		}
 
 		node = node->next;
 	} while (node != head);
@@ -114,17 +123,17 @@ void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node) {
 	node->prev->next = new_node;
 	node->prev = new_node;
 
-	// second condition needed because case when no element has a higher address than target
+	// second condition needed because case when no
+	// element has a higher address than target
 	// and it would insert before head
-	if (node == list->head && node->start_addr > new_node->start_addr) {
+	if (node == list->head && node->start_addr > new_node->start_addr)
 		list->head = new_node;
-	}
 }
 
-dll_node_t *dll_pop_first(dll_t *list) {
-	if (list->num_nodes == 0) {
+dll_node_t *dll_pop_first(dll_t *list)
+{
+	if (list->num_nodes == 0)
 		return NULL;
-	}
 
 	--(list->num_nodes);
 
@@ -140,7 +149,8 @@ dll_node_t *dll_pop_first(dll_t *list) {
 	return old_head;
 }
 
-void dll_erase_node(dll_t *list, dll_node_t *node) {
+void dll_erase_node(dll_t *list, dll_node_t *node)
+{
 	if (list->num_nodes == 0) {
 	#ifdef DEBUG_MODE
 		printf("[DEBUG - WARN] Warning: Trying to erase from empty list\n");
@@ -156,7 +166,6 @@ void dll_erase_node(dll_t *list, dll_node_t *node) {
 	tmp_next->prev = tmp_prev;
 	tmp_prev->next = tmp_next;
 
-	if (list->head == node && list->num_nodes > 0) {
+	if (list->head == node && list->num_nodes > 0)
 		list->head = list->head->next;
-	}
 }

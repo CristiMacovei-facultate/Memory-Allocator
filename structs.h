@@ -1,11 +1,10 @@
 #ifndef STRUCTS_H_GUARD
 #define STRUCTS_H_GUARD
 
-#include <stdint.h>
+#include <stdlib.h>
 
 #include "dll.h"
 #include "arraylist.h"
-
 
 typedef struct block {
 	size_t block_size;
@@ -16,11 +15,11 @@ typedef struct block {
 } block_t;
 
 typedef struct sfl {
-	uint64_t start_addr;
-	uint8_t type;
+	size_t start_addr;
+	unsigned char type;
 
 	arraylist_t *dlls; // arraylist of dll_t
-	arraylist_t *allocd_blocks; // array list of block_t 
+	arraylist_t *allocd_blocks; // array list of block_t
 	arraylist_t *fragmentations; // array list of fragm_data_t
 
 	// for memdump
@@ -30,7 +29,6 @@ typedef struct sfl {
 	int num_frees;
 	int num_fragmentations;
 } sfl_t;
-
 
 // data regarding a specific fragmentation
 typedef struct fragment_data {
