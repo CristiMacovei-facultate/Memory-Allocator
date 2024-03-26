@@ -1,3 +1,5 @@
+// Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 #ifndef INIT_H_GUARD
 #define INIT_H_GUARD
 

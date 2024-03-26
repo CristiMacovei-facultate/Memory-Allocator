@@ -1,3 +1,5 @@
+// Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>

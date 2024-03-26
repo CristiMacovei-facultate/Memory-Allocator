@@ -1,3 +1,5 @@
+// Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 #ifndef DLL_H_GUARD
 #define DLL_H_GUARD
 

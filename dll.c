@@ -1,3 +1,5 @@
+// Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 /* ----------------------------------------------
 implementation of a circular doubly linked list
 ---------------------------------------------- */

@@ -1,3 +1,5 @@
+// Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 #ifdef DEBUG_MODE
 #include <stdio.h>
 #endif

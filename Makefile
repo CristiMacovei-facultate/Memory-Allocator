@@ -1,3 +1,5 @@
+# Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 FILES = main.c arraylist.c dll.c utils.c cmd_utils.c commands/print.c commands/malloc.c commands/read.c commands/write.c commands/destroy.c commands/init.c commands/free.c
 CFLAGS = -Wall -Wextra -pedantic -std=c99
 

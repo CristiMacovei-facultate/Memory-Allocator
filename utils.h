@@ -1,3 +1,5 @@
+// Nicolae-Cristian MACOVEI, Anul I, Grupa 312CAb
+
 #ifndef UTILS_H_GUARD
 #define UTILS_H_GUARD
 
