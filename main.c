@@ -73,6 +73,7 @@ void repair_fragmentation(sfl_t *list, int fragment_index, size_t block_addr,
 	printf("Found shard, blowing it up from list\n");
 #endif
 	dll_erase_node(free_shard_dll, shard);
+	free(shard->data);
 	free(shard);
 
 	// attempt to recursively fix parent fragmentation

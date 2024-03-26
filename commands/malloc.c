@@ -75,6 +75,7 @@ int malloc_internal(sfl_t *list, size_t requested)
 									block_address_greater);
 		al_insert(list->allocd_blocks, block_idx, new_block);
 
+		free(mallocd_node->data);
 		free(mallocd_node);
 		free(new_block);
 
