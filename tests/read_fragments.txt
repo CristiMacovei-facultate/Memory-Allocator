@@ -1,7 +1,0 @@
-init_heap 0 2 16
-malloc 3
-malloc 5
-malloc 9
-read 0 10
-read 0 7
-destroy_heap
