@@ -42,9 +42,10 @@ dll_node_t *dll_find_first_if(dll_t *list, size_t target_addr)
 	dll_node_t *node = list->head;
 	do {
 	#ifdef DEBUG_MODE
-		printf("Trying node addr = 0x%lx\n", ((free_block_t *)node->data)->start_addr);
+		printf("Trying node addr = 0x%lx\n",
+			   ((free_block_t *)node->data)->start_addr);
 	#endif
-		if (((free_block_t*)node->data)->start_addr == target_addr)
+		if (((free_block_t *)node->data)->start_addr == target_addr)
 			return node;
 
 		node = node->next;
@@ -109,14 +110,16 @@ void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node)
 	dll_node_t *head = list->head;
 	dll_node_t *node = head;
 	do {
-		if (((free_block_t *)node->data)->start_addr > ((free_block_t *)new_node)->start_addr)
+		if (((free_block_t *)node->data)->start_addr >
+			((free_block_t *)new_node->data)->start_addr)
 			break;
 
 		node = node->next;
 	} while (node != head);
 
 #ifdef DEBUG_MODE
-	printf("[DEBUG] Will insert before node 0x%lx\n", ((free_block_t *)node->data)->start_addr);
+	printf("[DEBUG] Will insert before node 0x%lx\n",
+		   ((free_block_t *)node->data)->start_addr);
 #endif
 
 	new_node->next = node;
@@ -127,7 +130,8 @@ void dll_insert_before_first_if(dll_t *list, dll_node_t *new_node)
 	// second condition needed because case when no
 	// element has a higher address than target
 	// and it would insert before head
-	if (node == list->head && ((free_block_t *)node->data)->start_addr > ((free_block_t *)new_node->data)->start_addr)
+	if (node == list->head && ((free_block_t *)node->data)->start_addr >
+		((free_block_t *)new_node->data)->start_addr)
 		list->head = new_node;
 }
 

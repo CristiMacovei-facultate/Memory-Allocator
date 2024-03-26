@@ -23,7 +23,8 @@ void handle_destroy(sfl_t **ptr_list)
 			node = node->next;
 
 			#ifdef DEBUG_MODE
-			printf("Will free node of addr 0x%lx\n", ((free_block_t *)tmp->data)->start_addr);
+			printf("Will free node of addr 0x%lx\n",
+				   ((free_block_t *)tmp->data)->start_addr);
 			#endif
 
 			free(tmp->data);

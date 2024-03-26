@@ -60,7 +60,8 @@ void repair_fragmentation(sfl_t *list, int fragment_index, size_t block_addr,
 #endif
 
 	dll_node_t *shard = dll_find_first_if(free_shard_dll, free_shard_addr);
-	if (!shard || ((free_block_t *)shard->data)->start_addr != free_shard_addr) {
+	if (!shard ||
+		((free_block_t *)shard->data)->start_addr != free_shard_addr) {
 	#ifdef DEBUG_MODE
 		printf("Shard not found, adding new shard and exiting repair\n");
 	#endif
