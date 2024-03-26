@@ -14,6 +14,11 @@ typedef struct block {
 	void *data;
 } block_t;
 
+typedef struct free_block {
+	size_t start_addr;
+	int fragment_index;
+} free_block_t;
+
 typedef struct sfl {
 	size_t start_addr;
 	unsigned char type;

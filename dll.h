@@ -11,8 +11,7 @@ typedef struct dll_node {
 	struct dll_node *next;
 	struct dll_node *prev;
 
-	size_t start_addr;
-	int fragment_index;
+	void *data;
 } dll_node_t;
 
 typedef struct doubly_linked_list {

@@ -57,8 +57,7 @@ void handle_write(char *cmd, sfl_t **ptr_list)
 		free(data);
 
 	#ifdef DEBUG_MODE
-		printf("Segmentation Fault (not all bytes alloc'd - contig. until");
-		printf("%lu, needed %lu)\n", contig_until, addr + num_bytes);
+		printf("Segmentation Fault (not all bytes alloc'd)");
 	#else
 		printf("Segmentation fault (core dumped)\n");
 	#endif

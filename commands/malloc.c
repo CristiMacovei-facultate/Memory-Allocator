@@ -25,9 +25,10 @@ int malloc_internal(sfl_t *list, size_t requested)
 
 		// alloc head of dll
 		dll_node_t *mallocd_node = dll_pop_first(dll);
+		free_block_t *mallocd_block = (free_block_t *)mallocd_node->data;
 
 	#ifdef DEBUG_MODE
-		printf("Will malloc on addr %lu\n", mallocd_node->start_addr);
+		printf("Will malloc on addr %lu\n", mallocd_block->start_addr);
 		printf("Will break block of size %lu into %lu and %lu\n",
 			   dll->block_size, requested, dll->block_size - requested);
 	#endif
@@ -36,13 +37,13 @@ int malloc_internal(sfl_t *list, size_t requested)
 		// it's done in a way so that the list stays sorted in increasing order
 		block_t *new_block = malloc(sizeof(block_t));
 		new_block->block_size = requested;
-		new_block->start_addr = mallocd_node->start_addr;
+		new_block->start_addr = mallocd_block->start_addr;
 		new_block->data = calloc(requested, sizeof(uint8_t));
-		new_block->fragment_index = mallocd_node->fragment_index; // initially
+		new_block->fragment_index = mallocd_block->fragment_index; // initially
 
 		(list->num_allocs)++;
 		(list->total_allocd) += requested;
-		size_t shard_addr = mallocd_node->start_addr + requested;
+		size_t shard_addr = mallocd_block->start_addr + requested;
 		size_t shard_size = dll->block_size - requested;
 
 		if (shard_size > 0) {
@@ -54,7 +55,7 @@ int malloc_internal(sfl_t *list, size_t requested)
 				fd->shards[0].addr = new_block->start_addr;
 				fd->shards[1].size = shard_size;
 				fd->shards[1].addr = shard_addr;
-				fd->parent_fragm = mallocd_node->fragment_index;
+				fd->parent_fragm = mallocd_block->fragment_index;
 
 				al_insert(list->fragmentations, list->num_fragmentations, fd);
 				free(fd);

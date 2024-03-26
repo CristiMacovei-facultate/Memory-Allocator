@@ -1,3 +1,7 @@
+#ifdef DEBUG_MODE
+#include <stdio.h>
+#endif
+
 #include "../structs.h"
 
 void handle_destroy(sfl_t **ptr_list)
@@ -18,6 +22,11 @@ void handle_destroy(sfl_t **ptr_list)
 			// printf("Trying to free node addr = 0x%lx\n", node->start_addr);
 			node = node->next;
 
+			#ifdef DEBUG_MODE
+			printf("Will free node of addr 0x%lx\n", ((free_block_t *)tmp->data)->start_addr);
+			#endif
+
+			free(tmp->data);
 			free(tmp);
 		} while (node != head);
 	}

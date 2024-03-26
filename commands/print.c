@@ -40,10 +40,10 @@ void handle_print(sfl_t *list)
 			dll_node_t *node = dll->head;
 			do {
 			#ifdef DEBUG_MODE
-				printf(" 0x%lx (fi = %d)", node->start_addr,
-					   node->fragment_index);
+				printf(" 0x%lx (fi = %d)", ((free_block_t *)node->data)->start_addr,
+					   ((free_block_t *)node->data)->fragment_index);
 			#else
-				printf(" 0x%lx", node->start_addr);
+				printf(" 0x%lx", ((free_block_t *)node->data)->start_addr);
 			#endif
 				node = node->next;
 			} while (node != dll->head);

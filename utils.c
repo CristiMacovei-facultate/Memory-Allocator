@@ -61,8 +61,9 @@ void insert_new_shard(sfl_t *list, size_t shard_addr,
 					  size_t shard_size, int fragment_index)
 {
 	dll_node_t *shard = malloc(sizeof(dll_node_t));
-	shard->start_addr = shard_addr;
-	shard->fragment_index = fragment_index;
+	shard->data = malloc(sizeof(free_block_t));
+	((free_block_t *)shard->data)->start_addr = shard_addr;
+	((free_block_t *)shard->data)->fragment_index = fragment_index;
 	shard->next = NULL;
 	shard->prev = NULL;
 
